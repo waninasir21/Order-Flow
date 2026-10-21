@@ -1,7 +1,27 @@
-import type { Product } from "@prisma/client";
-import { prisma } from "./prisma";
+import { authMutations, authQueries } from "./resolvers/auth";
+import { catalogQueries, productFields } from "./resolvers/catalog";
+import { orderFields, orderItemFields, orderMutations, orderQueries } from "./resolvers/orders";
 
 export const typeDefs = /* GraphQL */ `#graphql
+  enum Role {
+    REP
+    ADMIN
+  }
+
+  enum OrderStatus {
+    PLACED
+    APPROVED
+    REJECTED
+    FULFILLED
+  }
+
+  type Employee {
+    id: ID!
+    name: String!
+    phone: String!
+    role: Role!
+  }
+
   type Outlet {
     id: ID!
     name: String!
@@ -18,19 +38,55 @@ export const typeDefs = /* GraphQL */ `#graphql
     stockQuantity: Int!
   }
 
+  type OrderItem {
+    id: ID!
+    product: Product!
+    quantity: Int!
+    priceAtOrder: Float!
+  }
+
+  type Order {
+    id: ID!
+    outlet: Outlet!
+    employee: Employee!
+    status: OrderStatus!
+    items: [OrderItem!]!
+    total: Float!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type AuthPayload {
+    accessToken: String!
+    refreshToken: String!
+    employee: Employee!
+  }
+
+  input OrderItemInput {
+    productId: ID!
+    quantity: Int!
+  }
+
   type Query {
+    me: Employee!
     outlets: [Outlet!]!
     products: [Product!]!
+    orders(outletId: ID, status: OrderStatus): [Order!]!
+  }
+
+  type Mutation {
+    login(phone: String!, password: String!): AuthPayload!
+    refreshTokens(refreshToken: String!): AuthPayload!
+    logout(refreshToken: String!): Boolean!
+    createOrder(outletId: ID!, items: [OrderItemInput!]!): Order!
+    updateOrderStatus(orderId: ID!, status: OrderStatus!): Order!
   }
 `;
 
 export const resolvers = {
-  Query: {
-    outlets: () => prisma.outlet.findMany({ orderBy: { createdAt: "asc" } }),
-    products: () => prisma.product.findMany({ orderBy: { createdAt: "asc" } }),
-  },
-  Product: {
-    // Prisma returns Decimal; GraphQL Float needs a number.
-    price: (p: Product) => p.price.toNumber(),
-  },
+  Query: { ...authQueries, ...catalogQueries, ...orderQueries },
+  Mutation: { ...authMutations, ...orderMutations },
+  Product: productFields,
+  Order: orderFields,
+  OrderItem: orderItemFields,
 };

@@ -20,26 +20,40 @@ enum OrderStatus {
 }
 
 model Outlet {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   name      String
   address   String
   ownerName String
   phone     String
   orders    Order[]
   employees Employee[] @relation("EmployeeOutlets")
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
 }
 
 model Employee {
-  id              String   @id @default(cuid())
+  id              String         @id @default(cuid())
   name            String
-  phone           String   @unique
-  // Unused in week 1; present now so week 2 auth needs no migration.
+  phone           String         @unique
   passwordHash    String
-  role            Role     @default(REP)
-  assignedOutlets Outlet[] @relation("EmployeeOutlets")
+  role            Role           @default(REP)
+  assignedOutlets Outlet[]       @relation("EmployeeOutlets")
   orders          Order[]
-  createdAt       DateTime @default(now())
+  refreshTokens   RefreshToken[]
+  createdAt       DateTime       @default(now())
+}
+
+// Server-side refresh tokens: only a SHA-256 hash is stored, never the token.
+// A token is single-use (rotated on every refresh); revokedAt marks it spent.
+model RefreshToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([employeeId])
 }
 
 model Product {
