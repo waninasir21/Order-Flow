@@ -33,11 +33,11 @@ export const orderQueries = {
 export const orderMutations = {
   createOrder: (
     _: unknown,
-    args: { outletId: string; items: OrderItemInput[] },
+    args: { outletId: string; items: OrderItemInput[]; clientId?: string | null },
     ctx: Context
   ) => {
     const auth = requireAuth(ctx);
-    return placeOrder(auth, args.outletId, args.items);
+    return placeOrder(auth, args.outletId, args.items, args.clientId ?? undefined);
   },
 
   updateOrderStatus: (

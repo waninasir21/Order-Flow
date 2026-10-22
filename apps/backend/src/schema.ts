@@ -50,6 +50,7 @@ export const typeDefs = /* GraphQL */ `#graphql
     outlet: Outlet!
     employee: Employee!
     status: OrderStatus!
+    clientId: ID
     items: [OrderItem!]!
     total: Float!
     createdAt: String!
@@ -78,7 +79,9 @@ export const typeDefs = /* GraphQL */ `#graphql
     login(phone: String!, password: String!): AuthPayload!
     refreshTokens(refreshToken: String!): AuthPayload!
     logout(refreshToken: String!): Boolean!
-    createOrder(outletId: ID!, items: [OrderItemInput!]!): Order!
+    # clientId makes the call idempotent: repeating it with the same clientId returns the
+    # original order instead of creating (and charging stock for) a second one.
+    createOrder(outletId: ID!, items: [OrderItemInput!]!, clientId: ID): Order!
     updateOrderStatus(orderId: ID!, status: OrderStatus!): Order!
   }
 `;
