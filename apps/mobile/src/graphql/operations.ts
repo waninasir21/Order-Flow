@@ -6,6 +6,7 @@ export const ORDER_FIELDS = gql`
   fragment OrderFields on Order {
     id
     status
+    clientId
     total
     createdAt
     outlet {
@@ -88,8 +89,8 @@ export const ORDERS = gql`
 `;
 
 export const CREATE_ORDER = gql`
-  mutation CreateOrder($outletId: ID!, $items: [OrderItemInput!]!) {
-    createOrder(outletId: $outletId, items: $items) {
+  mutation CreateOrder($outletId: ID!, $items: [OrderItemInput!]!, $clientId: ID) {
+    createOrder(outletId: $outletId, items: $items, clientId: $clientId) {
       ...OrderFields
     }
   }

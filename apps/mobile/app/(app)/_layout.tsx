@@ -1,4 +1,5 @@
 import { Redirect, Stack } from "expo-router";
+import { SyncManager } from "@/components/SyncManager";
 import { Loading } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
 
@@ -12,10 +13,14 @@ export default function AppLayout() {
   if (!signedIn) return <Redirect href="/login" />;
 
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="outlet/[id]" options={{ title: "Outlet" }} />
-      <Stack.Screen name="place-order/[outletId]" options={{ title: "Place order" }} />
-    </Stack>
+    <>
+      {/* Sends queued offline orders. Only mounted while signed in. */}
+      <SyncManager />
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="outlet/[id]" options={{ title: "Outlet" }} />
+        <Stack.Screen name="place-order/[outletId]" options={{ title: "Place order" }} />
+      </Stack>
+    </>
   );
 }

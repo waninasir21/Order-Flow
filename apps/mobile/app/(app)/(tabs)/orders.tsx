@@ -1,26 +1,29 @@
-import { useQuery } from "@apollo/client";
 import { useState } from "react";
 import { FlatList, RefreshControl, StyleSheet } from "react-native";
 import { OrderRow } from "@/components/OrderRow";
+import { PendingOrderCard } from "@/components/PendingOrderCard";
 import { EmptyState, ErrorState, Loading, colors } from "@/components/ui";
-import { ORDERS } from "@/graphql/operations";
-import type { Order } from "@/graphql/types";
+import { useOrdersFeed } from "@/hooks/useOrdersFeed";
 import { describeError } from "@/lib/errors";
 
 export default function OrdersScreen() {
-  // cache-and-network: show cached orders instantly, then confirm with the server.
-  const { data, loading, error, refetch } = useQuery<{ orders: Order[] }>(ORDERS, {
-    fetchPolicy: "cache-and-network",
-  });
+  // Queued orders from the phone first, then the server's. See useOrdersFeed.
+  const { items, query } = useOrdersFeed();
+  const { data, loading, error, refetch } = query;
   const [refreshing, setRefreshing] = useState(false);
 
-  if (loading && !data) return <Loading />;
-  if (error && !data) return <ErrorState message={describeError(error)} onRetry={() => void refetch()} />;
+  if (loading && !data && items.length === 0) return <Loading />;
+  // Offline with nothing to show at all. (Queued orders still show without a server list.)
+  if (error && !data && items.length === 0) {
+    return <ErrorState message={describeError(error)} onRetry={() => void refetch()} />;
+  }
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       await refetch();
+    } catch {
+      // Offline: keep showing what we have.
     } finally {
       setRefreshing(false);
     }
@@ -30,11 +33,17 @@ export default function OrdersScreen() {
     <FlatList
       style={styles.list}
       contentContainerStyle={styles.content}
-      data={data?.orders ?? []}
-      keyExtractor={(o) => o.id}
+      data={items}
+      keyExtractor={(item) => item.key}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       ListEmptyComponent={<EmptyState message="No orders yet. Open an outlet to place one." />}
-      renderItem={({ item }) => <OrderRow order={item} />}
+      renderItem={({ item }) =>
+        item.kind === "pending" ? (
+          <PendingOrderCard pending={item.pending} />
+        ) : (
+          <OrderRow order={item.order} />
+        )
+      }
     />
   );
 }
