@@ -30,6 +30,10 @@ export interface OrderItem {
 export interface Order {
   id: string;
   status: OrderStatus;
+  // The local UUID the app generated when it created the order (null for orders placed
+  // elsewhere). It links a queued local order to its server copy so the list never
+  // shows both.
+  clientId: string | null;
   total: number;
   createdAt: string;
   outlet: { id: string; name: string };

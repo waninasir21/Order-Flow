@@ -30,9 +30,13 @@ const TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 };
 export async function placeOrder(
   auth: AccessPayload,
   outletId: string,
-  items: OrderItemInput[]
+  items: OrderItemInput[],
+  clientId?: string
 ): Promise<OrderWithRelations> {
   if (items.length === 0) throw badInput("An order needs at least one item");
+  if (clientId !== undefined && (clientId.length === 0 || clientId.length > 64)) {
+    throw badInput("clientId must be between 1 and 64 characters");
+  }
 
   // Merge duplicate lines so the same product twice becomes one line with the summed quantity.
   const wanted = new Map<string, number>();
@@ -50,6 +54,14 @@ export async function placeOrder(
   });
   if (!employee) throw unauthenticated("Account no longer exists. Please log in again.");
 
+  // Idempotent replay: the offline queue may send the same order more than once (a lost
+  // response, an app killed mid-sync). Return the order we already created instead of
+  // creating a second one and deducting stock twice.
+  if (clientId !== undefined) {
+    const existing = await findByClientId(auth.employeeId, clientId);
+    if (existing) return existing;
+  }
+
   const outlet = await prisma.outlet.findUnique({
     where: { id: outletId },
     select: { id: true, employees: { where: { id: auth.employeeId }, select: { id: true } } },
@@ -60,6 +72,34 @@ export async function placeOrder(
     throw forbidden("This outlet is not assigned to you");
   }
 
+  try {
+    return await placeOrderTransaction(auth, outletId, wanted, clientId);
+  } catch (e) {
+    // Two identical requests racing: the database's unique(employeeId, clientId) lets only
+    // one win, and the whole losing transaction (including its stock changes) rolls back.
+    // The loser returns the winner's order.
+    if (
+      clientId !== undefined &&
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      e.code === "P2002"
+    ) {
+      const existing = await findByClientId(auth.employeeId, clientId);
+      if (existing) return existing;
+    }
+    throw e;
+  }
+}
+
+function findByClientId(employeeId: string, clientId: string) {
+  return prisma.order.findFirst({ where: { employeeId, clientId }, include: orderInclude });
+}
+
+async function placeOrderTransaction(
+  auth: AccessPayload,
+  outletId: string,
+  wanted: Map<string, number>,
+  clientId: string | undefined
+): Promise<OrderWithRelations> {
   return prisma.$transaction(async (tx) => {
     const products = await tx.product.findMany({ where: { id: { in: [...wanted.keys()] } } });
     if (products.length !== wanted.size) {
@@ -90,6 +130,7 @@ export async function placeOrder(
       data: {
         outletId,
         employeeId: auth.employeeId,
+        clientId,
         status: OrderStatus.PLACED,
         items: {
           create: products.map((p) => ({

@@ -4,14 +4,21 @@ import { useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, EmptyState, ErrorState, Loading, colors } from "@/components/ui";
-import { PRODUCTS } from "@/graphql/operations";
-import type { Product } from "@/graphql/types";
+import { OUTLETS, PRODUCTS } from "@/graphql/operations";
+import type { Outlet, Product } from "@/graphql/types";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
 import { describeError, errorCode, formatMoney } from "@/lib/errors";
+import { useNetworkStore } from "@/offline/network";
 
 export default function PlaceOrderScreen() {
   const { outletId } = useLocalSearchParams<{ outletId: string }>();
   const router = useRouter();
+  const offline = useNetworkStore((s) => !s.online);
+
+  // Already cached from the outlet list. A queued order keeps the outlet's name so it can
+  // be displayed while offline.
+  const outlets = useQuery<{ outlets: Outlet[] }>(OUTLETS);
+  const outletName = outlets.data?.outlets.find((o) => o.id === outletId)?.name ?? "Outlet";
 
   // Stock must be fresh when picking quantities, so always confirm with the server.
   const { data, loading, error, refetch } = useQuery<{ products: Product[] }>(PRODUCTS, {
@@ -52,13 +59,23 @@ export default function PlaceOrderScreen() {
   };
 
   const submit = async () => {
-    const items = Object.entries(quantities).map(([productId, quantity]) => ({ productId, quantity }));
-    if (items.length === 0 || !outletId) return;
+    const lines = products
+      .filter((p) => (quantities[p.id] ?? 0) > 0)
+      .map((p) => ({ productId: p.id, name: p.name, price: p.price, quantity: quantities[p.id] ?? 0 }));
+    if (lines.length === 0 || !outletId) return;
     try {
-      await createOrder(outletId, items);
-      Alert.alert("Order placed", "Your order was sent for approval.", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      const result = await createOrder({ outletId, outletName, lines });
+      if (result.kind === "synced") {
+        Alert.alert("Order placed", "Your order was sent for approval.", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert(
+          "Saved offline",
+          "There's no connection to the server. Your order is saved on this phone and will be sent automatically when you're back online.",
+          [{ text: "OK", onPress: () => router.back() }]
+        );
+      }
     } catch (e) {
       Alert.alert("Couldn't place order", describeError(e));
       if (errorCode(e) === "INSUFFICIENT_STOCK") {
@@ -119,6 +136,9 @@ export default function PlaceOrderScreen() {
         }}
       />
       <View style={styles.footer}>
+        {offline ? (
+          <Text style={styles.offline}>Offline: this order will be saved and sent when you're back online.</Text>
+        ) : null}
         <Text style={styles.total}>
           {lineCount} product{lineCount === 1 ? "" : "s"} · {formatMoney(total)}
         </Text>
@@ -165,4 +185,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   total: { fontSize: 16, fontWeight: "700", color: colors.text, textAlign: "center" },
+  offline: { color: "#92400e", backgroundColor: "#fef3c7", padding: 8, borderRadius: 8, textAlign: "center", fontSize: 13 },
 });
