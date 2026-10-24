@@ -2,6 +2,7 @@ import { Prisma, type OrderStatus } from "@prisma/client";
 import { prisma } from "../prisma";
 import { requireAuth, requireRole } from "../auth/guards";
 import type { Context } from "../context";
+import { notFound } from "../errors";
 import {
   changeOrderStatus,
   orderInclude,
@@ -27,6 +28,17 @@ export const orderQueries = {
       include: orderInclude,
       orderBy: { createdAt: "desc" },
     });
+  },
+
+  // One order, for the dashboard's detail page. A rep asking for someone else's order gets
+  // NOT_FOUND (not FORBIDDEN), so the API doesn't confirm that the order id exists.
+  order: async (_: unknown, args: { id: string }, ctx: Context) => {
+    const auth = requireAuth(ctx);
+    const order = await prisma.order.findUnique({ where: { id: args.id }, include: orderInclude });
+    if (!order || (auth.role === "REP" && order.employeeId !== auth.employeeId)) {
+      throw notFound("Order not found");
+    }
+    return order;
   },
 };
 

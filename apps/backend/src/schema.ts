@@ -73,6 +73,7 @@ export const typeDefs = /* GraphQL */ `#graphql
     outlets: [Outlet!]!
     products: [Product!]!
     orders(outletId: ID, status: OrderStatus): [Order!]!
+    order(id: ID!): Order!
   }
 
   type Mutation {

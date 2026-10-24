@@ -42,6 +42,7 @@ service → Prisma → response.
 | `me`, `products` | yes | yes |
 | `outlets` | only assigned outlets | all |
 | `orders` | only own orders | all |
+| `order(id)` | only own orders (someone else's order is `NOT_FOUND`) | any order |
 | `createOrder` | only for assigned outlets | any outlet (acting on behalf of a rep) |
 | `updateOrderStatus` | no (`FORBIDDEN`) | yes |
 
@@ -91,6 +92,7 @@ input OrderItemInput { productId: ID!  quantity: Int! }
 | `outlets` | any | Outlets (REP: assigned only), oldest first. |
 | `products` | any | All products, oldest first. |
 | `orders(outletId: ID, status: OrderStatus)` | any | Orders, newest first. REP sees only their own. Filters are optional. |
+| `order(id: ID!)` | any | One order with its outlet, rep and line items (added in week 5 for the dashboard's detail page). A REP asking for another rep's order gets `NOT_FOUND`, not `FORBIDDEN`, so the API never confirms that someone else's order id exists. |
 
 ### Mutations
 
@@ -166,7 +168,7 @@ Tokens expire after 15 minutes and every re-seed changes all IDs and invalidates
 ## Known limitations (not yet built)
 
 - No rate limiting, no brute-force lockout on login.
-- CORS is open (`cors()` with no origin list); restrict it before deploying.
+- CORS is open (`cors()` with no origin list); restrict it before deploying. The web dashboard does not need CORS at all (its server calls the API, not the browser), so only a future browser-side client would.
 - Apollo introspection and the Sandbox landing page are on; disable them in production.
 - No subscriptions yet (week 6). Redis is not used yet.
 - `price`/`total` are `Float` in GraphQL; amounts are exact in the database and in server arithmetic.

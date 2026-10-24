@@ -47,25 +47,37 @@ One `npm install` at the root is enough. Do not run it separately inside `apps\b
 |---|---|
 | `EXPO_PUBLIC_API_URL` | Full API URL, e.g. `http://192.168.1.50:4000/graphql`. Only needed if the automatic LAN address doesn't work (tunnel mode, deployed backend). |
 
+`apps/web/.env.local` (optional; copy `apps/web/.env.example`):
+
+| Variable | Meaning |
+|---|---|
+| `BACKEND_GRAPHQL_URL` | Where the GraphQL backend is. Default `http://localhost:4000/graphql`, so you only set it for another host. Read on the server only; the browser never calls the backend. |
+| `COOKIE_SECURE` | `"false"` to send the session cookies over plain http on a non-localhost address (see troubleshooting). Production builds mark cookies `Secure` by default; `next dev` does not. |
+
 Never paste a connection string or secret into chat, an issue or a commit.
 
 ## Running it day to day
 
-Use two terminals. Start the backend first.
+Use only the terminals you need. The backend is always first.
 
 ```powershell
-# Terminal 1 — backend
+# Terminal 1 — backend (always)
 cd apps\backend
 npm run dev                      # GraphQL at http://localhost:4000/graphql
 
-# Terminal 2 — mobile
+# Terminal 2 — EITHER the mobile app ...
 cd apps\mobile
 npx expo start                   # scan the QR code with Expo Go
+
+# ... OR the web dashboard
+cd apps\web
+npm run dev                      # http://localhost:3000, sign in as 9900000001 / password123
 ```
 
 - Open `http://localhost:4000/graphql` in a browser for Apollo Sandbox. `http://localhost:4000/health` returns `{"ok":true}`.
-- **Do not press `w`** in the Expo terminal (web target is unsupported, see troubleshooting).
-- **Do not use the root `npm run dev`**: it starts every app at once, which an i3/8GB laptop doesn't need. Use `npm run dev:backend` from the root if you want a root-level backend command.
+- **Run web and mobile together only when testing a cross-app flow** (week 6's real-time test). Each is heavy on an i3/8GB laptop.
+- **Do not press `w`** in the Expo terminal (the mobile app's web target is unsupported, see troubleshooting). The web dashboard is its own app in `apps\web`.
+- **Do not use the root `npm run dev`**: it starts every app at once, which an i3/8GB laptop doesn't need. From the root, use `npm run dev:backend` or `npm run dev:web` instead.
 - Windows Firewall may ask to allow Node on port 4000. Allow it on private networks, or the phone can't reach the API.
 
 ## Script reference
@@ -74,6 +86,7 @@ npx expo start                   # scan the QR code with Expo Go
 |---|---|---|
 | root | `npm run dev` | `turbo run dev` for all apps (avoid, see above) |
 | root | `npm run dev:backend` | backend dev server only |
+| root | `npm run dev:web` | web dashboard dev server only |
 | root | `npm run typecheck` | typecheck every workspace that has the task |
 | root | `npm run build` | `turbo run build` |
 | `apps/backend` | `npm run dev` | `tsx watch src/index.ts` (auto-restart on change) |
@@ -84,6 +97,11 @@ npx expo start                   # scan the QR code with Expo Go
 | `apps/backend` | `npx prisma studio` | browse the database in a browser |
 | `apps/mobile` | `npx expo start` | dev server for Expo Go |
 | `apps/mobile` | `npm run typecheck` | `tsc --noEmit` |
+| `apps/web` | `npm run dev` | Next.js dev server (Turbopack) on port 3000 |
+| `apps/web` | `npm run typecheck` | `next typegen` then `tsc --noEmit` |
+| `apps/web` | `npm run lint` | ESLint |
+| `apps/web` | `npm run build` | production build (also typechecks) |
+| `apps/web` | `npm start` | serve the production build (run `build` first) |
 
 Use `npx expo install <package>` (not `npm install`) to add Expo-related packages in `apps/mobile`: it picks the version that matches the Expo SDK.
 
@@ -92,6 +110,8 @@ Use `npx expo install <package>` (not `npm install`) to add Expo-related package
 ```powershell
 cd apps\backend; npx tsc --noEmit        # must print nothing
 cd ..\mobile;   npx tsc --noEmit         # must print nothing
+cd ..\web;      npm run typecheck        # must print no errors
+cd ..\web;      npm run lint             # must print nothing
 git status                               # no .env files; migrations and package-lock.json included
 ```
 

@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+/* Palette: warm paper, ink, one deep-green accent, and a dark ledger-green sidebar.
+   Status colors match the mobile app (placed = amber, approved = blue, fulfilled = green,
+   rejected = red). Both color schemes are defined here; nothing else hard-codes a color. */
+:root {
+  --bg: #f4f2ec;
+  --surface: #fffdf9;
+  --ink: #17201c;
+  --muted: #66706a;
+  --line: #e3dfd3;
+  --line-strong: #cfc9b9;
+  --accent: #1d6b57;
+  --accent-soft: #e1efe9;
+  --accent-ink: #ffffff;
+  --danger: #b3261e;
+  --danger-soft: #fbdcd8;
+  --warn: #8a5a00;
+  --warn-soft: #fdf0cf;
+
+  --side: #13201b;
+  --side-ink: #e6eee8;
+  --side-muted: #8ea399;
+  --side-line: #243529;
+  --side-active: #1f3329;
+
+  --placed-bg: #fdf0cf;   --placed-fg: #7a4f06;
+  --approved-bg: #dbe8fb; --approved-fg: #1b4a94;
+  --fulfilled-bg: #d9f0e1; --fulfilled-fg: #1a6a3c;
+  --rejected-bg: #fbdcd8; --rejected-fg: #9b2418;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1311;
+    --surface: #161d1a;
+    --ink: #e8eee9;
+    --muted: #93a097;
+    --line: #25302a;
+    --line-strong: #34423a;
+    --accent: #4fb99b;
+    --accent-soft: #17302a;
+    --accent-ink: #052018;
+    --danger: #f08c82;
+    --danger-soft: #3a1c19;
+    --warn: #e9b44c;
+    --warn-soft: #33270c;
+
+    --side: #0a0f0d;
+    --side-ink: #e1e9e3;
+    --side-muted: #7f9288;
+    --side-line: #1b2721;
+    --side-active: #15211b;
+
+    --placed-bg: #33270c;   --placed-fg: #f1c364;
+    --approved-bg: #14263f; --approved-fg: #8db8f5;
+    --fulfilled-bg: #123123; --fulfilled-fg: #7fd6a1;
+    --rejected-bg: #3a1c19; --rejected-fg: #f4a198;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-side: var(--side);
+  --color-side-ink: var(--side-ink);
+  --color-side-muted: var(--side-muted);
+  --color-side-line: var(--side-line);
+  --color-side-active: var(--side-active);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Money and counts line up in columns. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.55; }
+  50% { opacity: 1; }
+  100% { opacity: 0.55; }
+}
+
+.skeleton {
+  background: var(--line);
+  border-radius: 6px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}

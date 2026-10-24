@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Every problem here was actually hit while building the project.
+Most problems here were actually hit while building the project. In the **Web dashboard** section, items marked *(reproduced)* were reproduced while building it; items marked *(expected)* follow from how the code behaves but haven't been hit on your machine yet.
 
 ## Database / Prisma
 
@@ -69,6 +69,35 @@ Install Expo-related packages with `npx expo install <package>`, and run `npx ex
 
 **Both backend and Expo started at once and the laptop crawls**
 You ran the root `npm run dev`. Use the two-terminal workflow in [01-setup-and-build.md](01-setup-and-build.md).
+
+## Web dashboard
+
+**`Cannot find name 'PageProps'` from `tsc`, or red squiggles on `PageProps` in the editor** *(reproduced)*
+Next generates its route types on demand. Run `npm run typecheck` in `apps\web` (it runs `next typegen` first), not a bare `npx tsc --noEmit`. The editor errors clear after `next typegen`, `next dev` or `next build` has run once, and a "TypeScript: Restart TS Server".
+
+**"Couldn't load this page" with a Try again button** *(reproduced)*
+The Next.js server can't reach the backend: it isn't running, or Neon's free tier is waking up (a few seconds). You are still signed in; the cookies are kept. Start the backend (`npm run dev` in `apps\backend`) and click **Try again**. If the backend is elsewhere, set `BACKEND_GRAPHQL_URL` in `apps\web\.env.local` and restart `npm run dev`.
+
+**Sent back to `/login` with "Your session ended"** *(reproduced)*
+Expected whenever the backend rejects the session: the refresh token expired (7 days), you re-seeded the database (every employee and token is replaced), you changed `JWT_SECRET`, or you signed out in another tab. Sign in again.
+
+**"This dashboard is for administrators" / "That account isn't an administrator"** *(reproduced)*
+Expected for rep accounts: the dashboard is admin-only on purpose. Sign in with `9900000001` / `password123`. Reps use the mobile app.
+
+**"Can't reach the server" on the login form** *(reproduced)*
+Same cause as above: the backend isn't reachable from the Next.js server. Check `http://localhost:4000/health`.
+
+**Signed in, but every page bounces back to `/login`** *(expected)*
+Most likely the browser dropped the session cookies. Production builds (`npm run build` then `npm start`) mark cookies `Secure`, and a browser only accepts those on `https` or on `localhost`. If you open the production build through a LAN address such as `http://192.168.x.x:3000`, add `COOKIE_SECURE="false"` to `apps\web\.env.local` and restart. `npm run dev` doesn't have this problem. In the browser's developer tools (Application → Cookies) you should see `of_at` and `of_rt`, both HttpOnly.
+
+**Port 3000 is already in use** *(expected)*
+Run `npm run dev -- -p 3001`.
+
+**After pulling new code the dashboard behaves oddly** *(expected)*
+Stop `npm run dev`, delete `apps\web\.next`, and start it again (`Remove-Item -Recurse -Force .next`).
+
+**The order list doesn't include an order just placed on the phone** *(expected)*
+The dashboard has no live updates yet (week 6). Reload the page. An order placed offline shows up only after the phone has synced it, with the sync time as its date.
 
 ## Offline queue
 

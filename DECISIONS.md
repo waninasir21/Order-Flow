@@ -112,3 +112,43 @@ Each row stores the employee id, and the sync loop and the order lists only touc
 - A synced order's server `createdAt` is when it synced, not when the rep tapped Place order; the order of orders is preserved but the times aren't. A `clientCreatedAt` field would fix it.
 - Pending orders can be cancelled but not edited.
 - GraphQL types on the mobile app are hand-written until codegen goes into `shared-types`.
+
+## 2026-10-24 — Web session in two httpOnly cookies, not localStorage
+
+The week 5 doc allowed either. I used cookies: `of_at` (access token, 14 minutes) and `of_rt` (refresh token, 7 days), both `httpOnly`, `SameSite=Lax`, and `Secure` in production builds. JavaScript on the page can't read either, so an XSS bug can't steal a session. I checked this in a browser: the tokens are absent from `document.cookie`, `localStorage`, `sessionStorage` and the HTML. The trade-off I'm consciously accepting is that cookies are sent automatically, which opens the door to CSRF, where localStorage tokens (attached by my own code) don't have that problem. What limits it: `SameSite=Lax`; every mutation is a Next.js Server Action, which only accepts `POST` and rejects a request whose `Origin` doesn't match the host (documented in Next's data-security guide); and the only state-changing `GET` is `/auth/expired`, which just clears cookies, so the worst a hostile link can do is sign an admin out. The other cost is complexity: server components can't write cookies, so refreshing an expired session has to happen in `proxy.ts` and server actions.
+
+## 2026-10-24 — The browser never calls the backend: server components and plain `fetch`, no Apollo Client on the web
+
+The doc suggested `@apollo/experimental-nextjs-app-support` or a simpler client-only setup. I chose neither: server components, server actions and the proxy call the GraphQL API directly from the Next.js server with `fetch` (`lib/backend.ts` is the only place that does). That keeps tokens out of browser JavaScript, means there is no CORS to configure (the doc's listed pitfall simply doesn't arise), and the browser receives rendered HTML for a read-only dashboard. Trade-offs: no normalized client cache, and hand-written response types until codegen goes into `shared-types`. **Open question for week 6:** live updates need a WebSocket subscription from the browser, and the browser can't read the httpOnly cookie to authenticate it. Options are a short-lived token endpoint, proxying the WebSocket through Next, or a small client-side Apollo setup just for subscriptions. I'll decide that deliberately then instead of discovering it.
+
+## 2026-10-24 — Single-flight token refresh in the proxy
+
+Refresh tokens are single-use and reuse revokes the whole session (week 2). One page load fires several requests at once (prefetches, RSC fetches, server actions), so when the access cookie expires they all carry the same refresh token, and a naive implementation would refresh twice, look like token theft, and log the admin out. `refreshSession` keeps a map from refresh token to its in-flight promise, so everyone with the same token awaits one backend call and gets the same new pair; a finished result is kept 10 seconds for requests that were already in flight when the cookies rotated. An "unavailable" result is deliberately not kept, so "Try again" works as soon as the backend is back. Tested with 8 parallel requests carrying an expired session: exactly one backend refresh, no reuse detection, all eight succeeded. Limit: the map lives in one server process, so several instances would each refresh; the production fix is a short reuse grace window on the backend or a Redis lock. A backend outage never logs anyone out: only a definitive rejection from the backend clears the cookies.
+
+## 2026-10-24 — Admin-only is enforced on the server in three places; the proxy is not the security boundary
+
+A rep who signs in on the web gets no cookies and the refresh token the backend just issued is revoked (`loginAction`). Every page and the user menu call `getAdmin()` (a `me` query, memoized per request with React's `cache`), so even a rep's token or hand-made cookies is refused and cleared. And the backend scopes data by role regardless of what the UI does. The proxy only checks that a cookie exists, so it can redirect early, but I don't rely on it: a proxy-only check is a known mistake with this architecture. I tested the "rep gets into the dashboard" case by planting a real rep token in the cookies; it's rejected with an explanation. Cost: one extra small query per page, which is cheap next to the safety.
+
+## 2026-10-24 — Orders table filters, sorts and pages in the browser, with the state in the URL
+
+All orders are loaded and the table filters by status, searches, sorts (outlet, total, date) and pages (10 per page) client-side. For tens to hundreds of orders this is instant and needs no extra backend work. The state lives in the URL (`?status=PLACED&sort=total&page=2`) so Back from a detail page returns to the same view and a filtered list can be shared; only non-default values are written, with `history.replaceState` so changing a filter doesn't re-render the page on the server. The page maps results to a small row shape so the browser gets only what the table shows. When the list gets large, this moves to the backend: `orders(status:)` already filters, and paging and sorting would need adding. I decided on pagination now instead of letting the table silently become unusable as seed data grows.
+
+## 2026-10-24 — React Server Components with Suspense and Cache Components for instant navigation
+
+Each page renders its static title immediately and streams the data-dependent part behind `<Suspense>` with a skeleton; the sidebar highlight and user menu stream in the same way. Next prefetches the static part, so moving between Orders and Inventory feels instant while real data loads. Two consequences I accepted: an unknown order id shows the correct "Order not found" screen inside the dashboard but with HTTP 200 (the status is sent before `notFound()` runs; Next documents this and adds `noindex`, which doesn't matter for a login-protected admin page), and the user menu catches backend outages itself, because an error boundary can't catch an error thrown by its own segment's layout and would otherwise take the whole shell down.
+
+## 2026-10-24 — `order(id)` on the backend, returning NOT_FOUND for someone else's order
+
+The detail page needs one order, and fetching the whole list to pick one would be wasteful. A rep asking for another rep's order gets `NOT_FOUND`, not `FORBIDDEN`, so the API never confirms that someone else's order id exists. Both the dashboard and the mobile app can use it.
+
+## 2026-10-24 — Fixed locale and time zone, and line totals computed in whole paise
+
+`lib/format.ts` pins `en-IN` and `Asia/Kolkata`, because a time zone that differs between the Next.js server and the browser makes the server HTML and the client render disagree (hydration mismatches). Line totals are `round(price × 100) × quantity / 100`, so 3 × ₹142.50 shows ₹427.50 and never ₹427.49999. The order total shown is the backend's value, which it computed with `Decimal`.
+
+## 2026-10-24 — No status history yet, and the UI says so
+
+The backend stores only the current status, so the detail page's timeline shows "Placed" and "Last updated" plus a note that history isn't recorded, instead of faking one. A real history needs a status-event table written in `changeOrderStatus`, which is the single place status changes, so week 6 is the natural time to add it alongside approve/reject.
+
+## 2026-10-24 — How I verified week 5 without the real database, and what that doesn't prove
+
+The sandbox can't reach my Neon database, so I tested the dashboard in a real Chromium browser against a mock backend that copies the real backend's rules (single-use refresh tokens with reuse detection, rep-scoped orders, errors as HTTP 200 with `extensions.code`). 70 checks cover login and role refusal, cookie flags, filtering, sorting, paging, the detail page, the refresh race, a revoked session, a backend outage with and without an expired cookie, and phone width. I also validated every GraphQL document the web and mobile apps send against the real `schema.ts`. This proves the dashboard's logic and that its queries match the real schema; it doesn't prove the real backend's `order(id)` resolver or the real data, which is what the milestone test against my own database does.
