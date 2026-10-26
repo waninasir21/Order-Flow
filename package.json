@@ -10,9 +10,13 @@
     "dev:backend": "turbo run dev --filter=@orderflow/backend",
     "dev:web": "turbo run dev --filter=@orderflow/web",
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "check": "turbo run typecheck lint",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "turbo": "^2.3.0",
     "typescript": "^5.6.0"
   },

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs before every commit. A non-zero exit aborts the commit.
+# typecheck: backend, mobile and web (tsc). lint: web (eslint).
+npx turbo run typecheck lint --output-logs=errors-only
