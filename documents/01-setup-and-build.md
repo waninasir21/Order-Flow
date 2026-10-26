@@ -147,3 +147,15 @@ For a deployment, apply migrations with `npx prisma migrate deploy` (never `migr
 - `.env` is git-ignored; commit only `.env.example`.
 - Commit `apps/backend/prisma/migrations/` (the migration history is part of the project) and `package-lock.json`.
 - One focused commit per change. Tag the end of each week: `git tag week-N-done` then `git push origin week-N-done`.
+
+## Checks before every commit (week 6)
+
+`git commit` first runs `.husky/pre-commit`, which runs `npx turbo run typecheck lint`: TypeScript
+for the backend, mobile and web, and ESLint for the web. If anything fails, git aborts the commit and
+prints the errors; the commit only happens when everything passes. Turborepo caches results, so a
+second run with unchanged code takes a few seconds (a cold run takes about 40).
+
+- Run the same checks by hand: `npm run check` (or `npm run typecheck`, `npm run lint`).
+- The hook is installed by `npm install` (the root `prepare` script runs `husky`). After cloning, run `npm install` once.
+- Emergency bypass: `git commit --no-verify`. Use it rarely; a red commit is a red commit.
+- Only the web app has a linter so far; backend and mobile are covered by typecheck only.
