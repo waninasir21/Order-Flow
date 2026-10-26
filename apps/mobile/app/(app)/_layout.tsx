@@ -1,4 +1,5 @@
 import { Redirect, Stack } from "expo-router";
+import { LiveUpdates } from "@/components/LiveUpdates";
 import { SyncManager } from "@/components/SyncManager";
 import { Loading } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
@@ -16,6 +17,8 @@ export default function AppLayout() {
     <>
       {/* Sends queued offline orders. Only mounted while signed in. */}
       <SyncManager />
+      {/* Live order status changes from the dashboard (WebSocket subscription). */}
+      <LiveUpdates />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="outlet/[id]" options={{ title: "Outlet" }} />

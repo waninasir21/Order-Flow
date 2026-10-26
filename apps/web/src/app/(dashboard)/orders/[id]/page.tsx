@@ -3,12 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ArrowLeftIcon } from "@/components/icons";
-import { StatusBadge } from "@/components/status-badge";
 import { BackendError } from "@/lib/backend";
 import { getAdmin } from "@/lib/dal";
 import { formatDateTime, formatMoney, lineTotal, shortId } from "@/lib/format";
 import { gql } from "@/lib/graphql";
 import { ORDER, type OrderData } from "@/lib/queries";
+import { OrderHeader } from "./order-header";
 
 export const metadata: Metadata = { title: "Order" };
 
@@ -57,13 +57,7 @@ async function OrderDetail({ params }: { params: PageProps<"/orders/[id]">["para
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-mono text-2xl font-semibold tracking-tight">{shortId(order.id)}</h1>
-          <StatusBadge status={order.status} />
-        </div>
-        {/* Week 6: approve / reject buttons slot in here. */}
-      </div>
+      <OrderHeader orderId={order.id} title={shortId(order.id)} status={order.status} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section aria-labelledby="items-heading" className="overflow-hidden rounded-xl border border-line bg-surface">

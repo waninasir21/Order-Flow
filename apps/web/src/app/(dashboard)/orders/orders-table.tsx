@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SearchIcon } from "@/components/icons";
+import { OrderActions } from "@/components/order-actions";
 import { StatusBadge } from "@/components/status-badge";
 import { STATUSES, STATUS_LABEL, formatDateTime, formatMoney, shortId } from "@/lib/format";
 import type { OrderStatus } from "@/lib/queries";
+import { useOrderStatusChange } from "./use-order-status";
 
 // The page maps the GraphQL result to this small shape, so the browser only receives what the
 // table shows (no line items).
@@ -67,7 +69,9 @@ function writeFilters(f: Filters) {
   window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
 }
 
-export function OrdersTable({ orders }: { orders: OrderRowData[] }) {
+export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }) {
+  // `orders` is the server's data with any in-flight approve / reject layered on top.
+  const { items: orders, pending, error, dismissError, change } = useOrderStatusChange(serverOrders);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState<Filters>(() => readFilters(new URLSearchParams(searchParams.toString())));
@@ -153,8 +157,20 @@ export function OrdersTable({ orders }: { orders: OrderRowData[] }) {
         </label>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-        <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+      {error ? (
+        <p
+          role="alert"
+          className="mb-4 flex items-start justify-between gap-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger"
+        >
+          <span>{error}</span>
+          <button type="button" onClick={dismissError} className="font-semibold underline">
+            Dismiss
+          </button>
+        </p>
+      ) : null}
+
+      <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
+        <table className="w-full min-w-[980px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-muted">
               <th scope="col" className="px-4 py-3 font-semibold">Order</th>
@@ -164,7 +180,7 @@ export function OrdersTable({ orders }: { orders: OrderRowData[] }) {
               <SortableTh label="Total" align="right" active={filters.sort === "total"} dir={filters.dir} onSort={() => sortBy("total")} />
               <th scope="col" className="px-4 py-3 font-semibold">Status</th>
               <SortableTh label="Placed" active={filters.sort === "date"} dir={filters.dir} onSort={() => sortBy("date")} />
-              {/* Week 6: an actions column (approve / reject) goes here. */}
+              <th scope="col" className="px-4 py-3 font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -191,6 +207,9 @@ export function OrdersTable({ orders }: { orders: OrderRowData[] }) {
                   <StatusBadge status={o.status} />
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-muted">{formatDateTime(o.createdAt)}</td>
+                <td className="px-4 py-3">
+                  <OrderActions status={o.status} disabled={pending} onChange={(to) => change(o.id, to)} />
+                </td>
               </tr>
             ))}
           </tbody>

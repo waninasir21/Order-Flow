@@ -1,8 +1,9 @@
 # Web Dashboard (Next.js)
 
-`apps/web`: the administrator dashboard. **Read-only in week 5**: an orders list, an order detail
-page and an inventory page, all showing live data from the same GraphQL backend the mobile app
-uses. Approve/reject and live updates arrive in week 6.
+`apps/web`: the administrator dashboard: an orders list, an order detail page and an inventory
+page, showing data from the same GraphQL backend the mobile app uses. **Since week 6 it can write**:
+approve / reject / fulfil orders and edit stock, with optimistic updates. (It does not yet receive
+live pushes itself; see `DECISIONS.md`.)
 
 | Concern | Choice |
 |---|---|
@@ -49,10 +50,12 @@ app/
     ├── layout.tsx               shell: sidebar, header, user menu (streams in)
     ├── actions.ts               logoutAction
     ├── error.tsx                "Couldn't load this page" + Try again
-    ├── orders/                  page.tsx (server), orders-table.tsx (client)
-    │   └── [id]/                page.tsx (detail), not-found.tsx
-    └── inventory/               page.tsx (server), inventory-table.tsx (client)
-components/                      sidebar-nav(+active), user-menu, page-header, status-badge, table-skeleton, icons
+    ├── orders/                  page.tsx (server), orders-table.tsx (client), actions.ts (Server Action),
+    │   │                        use-order-status.ts (optimistic hook)
+    │   └── [id]/                page.tsx (detail), order-header.tsx (client: badge + buttons), not-found.tsx
+    └── inventory/               page.tsx (server), inventory-table.tsx (client, inline editor),
+                                 actions.ts (Server Action), use-stock-edit.ts (optimistic hook)
+components/                      sidebar-nav(+active), user-menu, page-header, status-badge, order-actions, table-skeleton, icons
 lib/
 ├── config.ts                    cookie names, lifetimes, BACKEND_URL (no next/headers: the proxy imports it)
 ├── backend.ts                   backendRequest(): the only function that calls the backend
@@ -61,6 +64,9 @@ lib/
 ├── graphql.ts                   gql(): attaches the access token, handles auth failures
 ├── dal.ts                       getAdmin(): the authorization check
 ├── queries.ts                   every GraphQL document + hand-written response types
+├── action-result.ts             turns a failed backend call into a message for the person clicking
+├── transitions.ts               which buttons each status offers (mirrors the backend state machine)
+├── stock.ts                     stock bounds and parsing of the typed number
 └── format.ts                    money, dates, short ids, line totals, status labels
 ```
 
@@ -155,11 +161,11 @@ allows for Neon's free tier waking up.
 - The filter state lives **in the URL** (`?status=PLACED&q=khan&sort=total&dir=desc&page=2`, only non-default values), so Back from a detail page returns to the same view and a filtered list can be shared. It's written with `history.replaceState`, which updates the URL without asking the server to render again.
 - The page maps GraphQL results to a small row shape, so the browser receives only what the table shows (no line items).
 - Why client-side: the list is small (a rep's team, tens to hundreds of orders), it makes filtering instant, and it avoids extra backend round trips. When the list grows large, move filtering and paging to the backend (`orders(status:)` already exists; paging would need adding). See `DECISIONS.md`.
-- Week 6 hooks: `OrderRowData` is the row type, and `orders-table.tsx` has a marked place for an actions column; the status badge is its own component so a live-updating badge can replace it.
+- **Actions column (week 6):** each row shows only the moves the state machine allows: `PLACED` → Approve / Reject, `APPROVED` → Mark fulfilled, `REJECTED` and `FULFILLED` → "No further actions". Reject asks "Reject and return stock?" first. See "Writing data" below.
 
 ### Order detail (`/orders/[id]`)
 
-- Header: short id and status badge. Left: line-item table (product, SKU, quantity, **price at order**, line total) and the order total. Right: outlet card (name, address, owner, phone), "Placed by" card (rep, phone, role), and a timeline.
+- Header: short id, status badge and the same action buttons as the list (`order-header.tsx`). Left: line-item table (product, SKU, quantity, **price at order**, line total) and the order total. Right: outlet card (name, address, owner, phone), "Placed by" card (rep, phone, role), and a timeline.
 - Line totals are computed in whole paise (`lineTotal` in `lib/format.ts`), so 3 × ₹142.50 shows ₹427.50, never ₹427.49999.
 - **Status history isn't recorded** (the backend stores only the current status), so the timeline shows "Placed" and "Last updated" and says so. A real history needs a status-event table, which is a sensible week 6 addition.
 - An unknown or inaccessible id shows "Order not found" inside the dashboard shell. See "Known limitations" for why that response has HTTP 200.
@@ -168,7 +174,26 @@ allows for Neon's free tier waking up.
 
 - Summary tiles: products, low stock, out of stock. Table: product, SKU, price, stock, and a status cell.
 - **Low stock = fewer than 10** (`LOW_STOCK_THRESHOLD` in `lib/format.ts`); **0 is "Out of stock"**; exactly 10 is OK. "Low stock only" checkbox and a name/SKU search.
-- No editing yet (week 6).
+- **Inline stock editing (week 6):** click a number, type a new whole number, Enter or Save to commit, Escape or Cancel to discard. Negatives, decimals and anything above 1,000,000 are refused in the field and again by the Server Action and the backend. The new number and the low-stock badge update at once and snap back if the server refuses.
+
+## Writing data (week 6)
+
+Approve / reject / fulfil and stock edits are **Server Actions** (`orders/actions.ts`,
+`inventory/actions.ts`). A Server Action is a public POST endpoint, so each one calls `getAdmin()`
+and validates its arguments before it calls the backend.
+
+The optimistic update uses React's `useOptimistic` inside a transition (`use-order-status.ts`,
+`use-stock-edit.ts`):
+
+1. Click: the new status shows immediately and the buttons disable.
+2. The action runs. On success it calls `refresh()`, so the page's real data arrives in the same
+   render and replaces the temporary value without a flash.
+3. On failure the real data is unchanged, so the UI returns to the old value on its own, and an
+   alert explains why (for example "Order status was changed by someone else"). `CONFLICT` and
+   `BAD_USER_INPUT` also trigger `refresh()` so the screen shows the truth.
+
+The week's doc says "update the Apollo cache"; the dashboard has no Apollo on purpose (see
+`DECISIONS.md`), so `useOptimistic` plays that role.
 
 ## Formatting
 
@@ -202,6 +227,13 @@ schema (`apps/backend/src/schema.ts`), as were the mobile app's.
 
 **Not yet verified:** a run against the real backend and database. That is the milestone test below.
 
+Week 6 added 18 more browser checks against the same kind of mock backend: no buttons on a
+fulfilled order; the badge flips to Approved while the backend is still answering; buttons disabled in
+flight and exactly one mutation sent; rollback to Placed with the backend's message after a forced
+`CONFLICT`; Reject needs confirmation and sends nothing until confirmed; the detail page swaps
+Approve for Mark fulfilled; stock edit rejects negatives, saves 7, shows the low-stock badge,
+Escape closes the editor, and a refused edit rolls back. No browser console errors.
+
 ### The week 5 milestone test (you run this)
 
 1. Backend running (`apps\backend`, `npm run dev`), then `apps\web`, `npm run dev`.
@@ -221,4 +253,5 @@ schema (`apps/backend/src/schema.ts`), as were the mobile app's.
 - **`price` and `total` arrive as `Float`.** Line totals are re-computed in paise on the page; the displayed order total is the backend's value.
 - **No rate limiting or lockout** on login (it's on the backend's list too).
 - **Cookies over plain http on a LAN address:** production builds mark cookies `Secure`, which a browser only accepts on `https` or `localhost`. Use `COOKIE_SECURE="false"` only for such local tests.
-- **Read-only.** Approve/reject, product editing and live updates are week 6.
+- **Not live.** The dashboard reflects its own actions immediately but not another admin's until a reload. Making it live without exposing the httpOnly token needs a server-side stream (see `DECISIONS.md`).
+- **No audit trail.** Neither status changes nor stock edits record who made them.

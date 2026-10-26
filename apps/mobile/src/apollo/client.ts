@@ -1,7 +1,17 @@
-import { ApolloClient, HttpLink, InMemoryCache, Observable, from } from "@apollo/client";
+import {
+  ApolloClient,
+  HttpLink,
+  InMemoryCache,
+  Observable,
+  from,
+  split,
+} from "@apollo/client";
 import type { FetchResult } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
+import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
+import { getMainDefinition } from "@apollo/client/utilities";
+import { createClient } from "graphql-ws";
 import { API_URL } from "@/config";
 import { REFRESH_TOKENS_DOCUMENT } from "@/graphql/operations";
 import { useAuthStore } from "@/stores/auth";
@@ -12,7 +22,12 @@ const httpLink = new HttpLink({ uri: API_URL });
 // picked up automatically (including when the error link retries an operation).
 const authLink = setContext((_, { headers }) => {
   const token = useAuthStore.getState().accessToken;
-  return { headers: { ...headers, ...(token ? { authorization: `Bearer ${token}` } : {}) } };
+  return {
+    headers: {
+      ...headers,
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+  };
 });
 
 // Refresh tokens are single-use on the server, so two parallel refreshes would
@@ -46,7 +61,9 @@ async function doRefresh(): Promise<boolean> {
       }),
     });
     const json = (await res.json()) as {
-      data?: { refreshTokens?: { accessToken: string; refreshToken: string } } | null;
+      data?: {
+        refreshTokens?: { accessToken: string; refreshToken: string };
+      } | null;
     };
     const tokens = json.data?.refreshTokens;
     if (!tokens) {
@@ -63,7 +80,9 @@ async function doRefresh(): Promise<boolean> {
 }
 
 const errorLink = onError(({ graphQLErrors, operation, forward }) => {
-  const unauthenticated = graphQLErrors?.some((e) => e.extensions?.code === "UNAUTHENTICATED");
+  const unauthenticated = graphQLErrors?.some(
+    (e) => e.extensions?.code === "UNAUTHENTICATED",
+  );
   // Login failures are also UNAUTHENTICATED ("wrong password"); never refresh for those.
   if (!unauthenticated || operation.operationName === "Login") return;
   // Retry each operation at most once.
@@ -83,8 +102,86 @@ const errorLink = onError(({ graphQLErrors, operation, forward }) => {
   });
 });
 
+// ---- Subscriptions (WebSocket) -------------------------------------------------------
+// Same server, same path, ws:// instead of http://.
+const WS_URL = API_URL.replace(/^http/, "ws");
+
+// Seconds before expiry at which we treat the access token as already expired.
+const EXPIRY_MARGIN_S = 30;
+
+function accessTokenExpiresSoon(token: string): boolean {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return true;
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const { exp } = JSON.parse(json) as { exp?: number };
+    return (
+      typeof exp !== "number" ||
+      exp * 1000 - Date.now() < EXPIRY_MARGIN_S * 1000
+    );
+  } catch {
+    return true;
+  }
+}
+
+// A socket authenticates once, when it connects (browsers and React Native can't set headers
+// on a WebSocket, so the token travels in connectionParams). The server closes the socket
+// when the token expires; graphql-ws then reconnects and calls this again, so a stale token
+// is refreshed BEFORE it is sent. Without this, every reconnect after 15 minutes would fail.
+async function wsConnectionParams() {
+  const token = useAuthStore.getState().accessToken;
+  if (!token || accessTokenExpiresSoon(token)) await refreshSession();
+  return { accessToken: useAuthStore.getState().accessToken };
+}
+
+const wsClient = createClient({
+  url: WS_URL,
+  // Connect when the first subscription starts, disconnect when the last one stops. The
+  // LiveUpdates component only runs while signed in, so logging out closes the socket.
+  lazy: true,
+  connectionParams: wsConnectionParams,
+  // Phones lose signal all the time: keep retrying, forever, with a capped backoff.
+  retryAttempts: Infinity,
+  retryWait: (retries) =>
+    new Promise((resolve) =>
+      setTimeout(
+        resolve,
+        Math.min(300 * 2 ** retries, 15_000) + Math.random() * 500,
+      ),
+    ),
+});
+
+// Events published while the socket was down are gone for good (the server keeps no backlog),
+// so every (re)connection ends with a plain refetch of the orders list to catch up.
+wsClient.on("connected", () => {
+  // Only if the Orders screen's query is alive right now. Asking for a query that isn't
+  // active makes Apollo warn; and if it isn't active nothing is stale, because the screen
+  // fetches fresh data (cache-and-network) the next time it opens.
+  const ordersActive = [
+    ...apolloClient.getObservableQueries("active").values(),
+  ].some((q) => q.queryName === "Orders");
+  if (ordersActive)
+    void apolloClient
+      .refetchQueries({ include: ["Orders"] })
+      .catch(() => undefined);
+});
+
+const wsLink = new GraphQLWsLink(wsClient);
+
+// Subscriptions go over the socket; queries and mutations stay on HTTP.
+const transportLink = split(
+  ({ query }) => {
+    const def = getMainDefinition(query);
+    return (
+      def.kind === "OperationDefinition" && def.operation === "subscription"
+    );
+  },
+  wsLink,
+  from([errorLink, authLink, httpLink]),
+);
+
 export const apolloClient = new ApolloClient({
-  link: from([errorLink, authLink, httpLink]),
+  link: transportLink,
   cache: new InMemoryCache(),
 });
 

@@ -117,3 +117,29 @@ Expo Go loads the app's code from the laptop. Don't reload or shake the app whil
 
 **`.env` shows up in `git status`**
 Stop and don't commit. The root `.gitignore` must be next to the root `package.json` and contain `.env`. If a `.env` was ever committed, rotate the database password in Neon, because it's in the history.
+
+## Real-time (week 6)
+
+**The phone doesn't update when I approve on the web**
+Check the backend console printed `Subscriptions ready at ws://…`. The phone connects to the same host
+as the HTTP API (`src/config.ts`), so if queries work but updates don't, something between the phone
+and laptop is blocking WebSockets (a VPN, a hotspot with client isolation). Pull to refresh still works.
+Also check you are signed in as the rep who placed that order: reps only receive their own orders.
+
+**No notification banner**
+You may have denied the permission: enable notifications for Expo Go in the phone's settings. The
+badge still changes without it.
+
+**Order changes only after ~15 minutes' delay, or stops updating after a long idle**
+The socket reconnects with a refreshed token; if the refresh token itself has expired (7 days) or was
+revoked you are logged out. Sign in again.
+
+**`Cannot find module 'graphql-ws'` / `ws` on the backend**
+Run `npm install` at the repo root; week 6 added `graphql-ws`, `graphql-subscriptions`, `ws` and
+`@graphql-tools/schema` to the backend and `graphql-ws` and `expo-notifications` to the phone.
+
+**Red screen: `Cannot find native module 'ExpoTopicSubscriptionModule'`, then "Route ./(app)/_layout.tsx is missing the required default export"**
+`expo-notifications` was imported at startup and this Expo Go build doesn't contain one of its native modules. The app now loads it lazily (`src/realtime/notifications.ts`) and carries on without banners if it is missing. Live status updates don't depend on it.
+
+**Metro: `Failed to start watch mode` or `Cannot read properties of undefined (reading 'get')` (DependencyGraph)**
+Metro's file watcher didn't become ready within 4 minutes. Stop all node processes, delete `apps\web\.next`, keep `apps\mobile\metro.config.js` (it stops Metro watching the web app and backend), and if it persists exclude the project folder from Windows Defender real-time scanning.

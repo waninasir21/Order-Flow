@@ -96,3 +96,15 @@ export const CREATE_ORDER = gql`
   }
   ${ORDER_FIELDS}
 `;
+
+// Fires when an admin approves / rejects / fulfils an order. The rep only receives their own
+// orders (the server filters), and the selection matches the Orders list so the payload can
+// replace the cached copy as-is.
+export const ORDER_STATUS_CHANGED = gql`
+  subscription OrderStatusChanged {
+    orderStatusChanged {
+      ...OrderFields
+    }
+  }
+  ${ORDER_FIELDS}
+`;

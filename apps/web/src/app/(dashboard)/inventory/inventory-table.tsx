@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SearchIcon } from "@/components/icons";
 import { LOW_STOCK_THRESHOLD, formatMoney } from "@/lib/format";
+import { MAX_STOCK, parseStock } from "@/lib/stock";
+import { useStockEdit } from "./use-stock-edit";
 
 export interface ProductRowData {
   id: string;
@@ -12,7 +14,9 @@ export interface ProductRowData {
   stock: number;
 }
 
-export function InventoryTable({ products }: { products: ProductRowData[] }) {
+export function InventoryTable({ products: serverProducts }: { products: ProductRowData[] }) {
+  const { items: products, pending, error, dismissError, save } = useStockEdit(serverProducts);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
 
@@ -42,6 +46,18 @@ export function InventoryTable({ products }: { products: ProductRowData[] }) {
         <Stat label="Out of stock" value={stats.out} tone={stats.out > 0 ? "danger" : undefined} />
       </dl>
 
+      {error ? (
+        <p
+          role="alert"
+          className="mb-4 flex items-start justify-between gap-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger"
+        >
+          <span>{error}</span>
+          <button type="button" onClick={dismissError} className="font-semibold underline">
+            Dismiss
+          </button>
+        </p>
+      ) : null}
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
           <input
@@ -68,7 +84,7 @@ export function InventoryTable({ products }: { products: ProductRowData[] }) {
       {/* `relative` matters: the table's sr-only header is absolutely positioned. Without a positioned
           scroll container it escapes the container's clipping and widens the whole page on phones. */}
       <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
-        <table className="w-full min-w-[560px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-muted">
               <th scope="col" className="px-4 py-3 font-semibold">Product</th>
@@ -86,7 +102,29 @@ export function InventoryTable({ products }: { products: ProductRowData[] }) {
                 <td className="px-4 py-3 font-medium">{p.name}</td>
                 <td className="px-4 py-3 font-mono text-xs text-muted">{p.sku}</td>
                 <td className="num px-4 py-3 text-right">{formatMoney(p.price)}</td>
-                <td className="num px-4 py-3 text-right font-medium">{p.stock}</td>
+                <td className="px-4 py-2 text-right">
+                  {editingId === p.id ? (
+                    <StockEditor
+                      initial={p.stock}
+                      name={p.name}
+                      busy={pending}
+                      onCancel={() => setEditingId(null)}
+                      onSave={(value) => {
+                        setEditingId(null);
+                        if (value !== p.stock) save(p.id, value);
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(p.id)}
+                      aria-label={`Edit stock for ${p.name}, currently ${p.stock}`}
+                      className="num rounded-md px-2 py-1 font-medium underline decoration-line-strong decoration-dotted underline-offset-4 hover:bg-bg"
+                    >
+                      {p.stock}
+                    </button>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <StockBadge stock={p.stock} />
                 </td>
@@ -101,6 +139,73 @@ export function InventoryTable({ products }: { products: ProductRowData[] }) {
         ) : null}
       </div>
     </section>
+  );
+}
+
+// Inline editor: Enter or Save commits, Escape or Cancel discards. (No save/cancel on blur: Safari
+// doesn't focus buttons on click, so a blur handler would cancel before Save could fire.)
+function StockEditor({
+  initial,
+  name,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  initial: number;
+  name: string;
+  busy: boolean;
+  onSave: (value: number) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState(String(initial));
+  const [problem, setProblem] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => ref.current?.select(), []);
+
+  const submit = () => {
+    const parsed = parseStock(text);
+    if ("error" in parsed) setProblem(parsed.error);
+    else onSave(parsed.value);
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="flex flex-col items-end gap-1"
+    >
+      <div className="flex items-center gap-1.5">
+        <input
+          ref={ref}
+          value={text}
+          inputMode="numeric"
+          disabled={busy}
+          aria-label={`New stock for ${name} (0 to ${MAX_STOCK})`}
+          aria-invalid={problem ? true : undefined}
+          onChange={(e) => {
+            setText(e.target.value);
+            setProblem(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onCancel();
+          }}
+          className="num w-24 rounded-md border border-line-strong bg-bg px-2 py-1 text-right outline-none focus:border-accent"
+        />
+        <button type="submit" disabled={busy} className="rounded-md bg-accent px-2.5 py-1 text-xs font-semibold text-accent-ink disabled:opacity-50">
+          Save
+        </button>
+        <button type="button" onClick={onCancel} className="rounded-md border border-line-strong px-2.5 py-1 text-xs font-medium hover:bg-bg">
+          Cancel
+        </button>
+      </div>
+      {problem ? (
+        <p role="alert" className="text-xs text-danger">
+          {problem}
+        </p>
+      ) : null}
+    </form>
   );
 }
 

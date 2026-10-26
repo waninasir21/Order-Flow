@@ -93,6 +93,14 @@ into the cached list.
 4. After a send, the new order is prepended to the cached Orders list (`apollo/orderCache.ts`) and the cached products are evicted, so any screen showing stock refetches.
 5. On `INSUFFICIENT_STOCK` the screen shows the server's message, reloads stock and caps the cart to what's left.
 
+## Live updates (week 6)
+
+`LiveUpdates` (mounted next to `SyncManager` while signed in) runs `useOrderUpdates`, one
+subscription to `orderStatusChanged` for the whole app. Details are in
+[08-realtime.md](08-realtime.md). In short: the Apollo link splits subscriptions onto a graphql-ws
+WebSocket (`apollo/client.ts`), an event is written straight into the cache and deduplicated
+(`realtime/applyOrderUpdate.ts`), and a local notification is shown (`realtime/notifications.ts`).
+
 ## Conventions
 
 - Add Expo packages with `npx expo install <package>` so versions match the SDK.

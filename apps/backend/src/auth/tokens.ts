@@ -6,10 +6,13 @@ import { config } from "../config";
 export interface AccessPayload {
   employeeId: string;
   role: Role;
+  // Seconds since epoch; set when a token is verified (not when signing). Long-lived
+  // WebSocket connections use it to close themselves when the token expires.
+  exp?: number;
 }
 
-export function signAccessToken(payload: AccessPayload): string {
-  return jwt.sign(payload, config.jwtSecret, {
+export function signAccessToken({ employeeId, role }: AccessPayload): string {
+  return jwt.sign({ employeeId, role }, config.jwtSecret, {
     algorithm: "HS256",
     expiresIn: config.accessTokenTtlSeconds,
   });
@@ -20,10 +23,14 @@ export function verifyAccessToken(token: string): AccessPayload | null {
   try {
     const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ["HS256"] });
     if (typeof decoded === "string") return null;
-    const { employeeId, role } = decoded as { employeeId?: unknown; role?: unknown };
+    const { employeeId, role, exp } = decoded as {
+      employeeId?: unknown;
+      role?: unknown;
+      exp?: unknown;
+    };
     if (typeof employeeId !== "string") return null;
     if (role !== "REP" && role !== "ADMIN") return null;
-    return { employeeId, role };
+    return { employeeId, role, exp: typeof exp === "number" ? exp : undefined };
   } catch {
     return null;
   }
