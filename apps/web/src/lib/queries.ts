@@ -78,6 +78,24 @@ export const PRODUCTS = /* GraphQL */ `
   }
 `;
 
+export const UPDATE_ORDER_STATUS = /* GraphQL */ `
+  mutation UpdateOrderStatus($orderId: ID!, $status: OrderStatus!) {
+    updateOrderStatus(orderId: $orderId, status: $status) {
+      id
+      status
+    }
+  }
+`;
+
+export const UPDATE_PRODUCT_STOCK = /* GraphQL */ `
+  mutation UpdateProductStock($productId: ID!, $stockQuantity: Int!) {
+    updateProductStock(productId: $productId, stockQuantity: $stockQuantity) {
+      id
+      stockQuantity
+    }
+  }
+`;
+
 export interface Me { id: string; name: string; phone: string; role: Role }
 
 export interface LoginData {

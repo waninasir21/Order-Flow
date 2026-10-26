@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Inventory" };
 export default function InventoryPage() {
   return (
     <>
-      <PageHeader title="Inventory" description="Current stock for every product. Read-only for now." />
+      <PageHeader title="Inventory" description="Current stock for every product. Click a number to edit it." />
       <Suspense fallback={<TableSkeleton />}>
         <InventoryData />
       </Suspense>

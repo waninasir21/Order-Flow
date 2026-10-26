@@ -8,15 +8,17 @@ Prisma (see [02-database-prisma.md](02-database-prisma.md)). Schema is written a
 
 | File | Responsibility |
 |---|---|
-| `index.ts` | Starts Express, `/health`, `/graphql` with CORS and the Apollo middleware. Port from `PORT` (default 4000). |
+| `index.ts` | Starts one HTTP server shared by Express (`/health`, `/graphql` over HTTP) and the graphql-ws WebSocket server (`ws://…/graphql`). Port from `PORT` (default 4000). Refuses unauthenticated sockets and closes each socket when its token expires. |
 | `config.ts` | Reads required env vars. Throws at startup if `JWT_SECRET` is missing. Token lifetimes live here (access 15 min, refresh 7 days). |
-| `schema.ts` | The GraphQL type definitions and the resolver map. |
+| `schema.ts` | The GraphQL type definitions, the resolver map, and the executable `schema` shared by HTTP and WebSocket. |
+| `pubsub.ts` | The in-memory `PubSub` and `publishOrderStatusChanged`. |
 | `context.ts` | Builds the per-request context: parses `Authorization: Bearer <token>` into `ctx.auth` (`{ employeeId, role }`) or `null`. |
 | `errors.ts` | Error factories that set `extensions.code`. |
 | `auth/tokens.ts` | Signs/verifies access JWTs (HS256), generates and hashes refresh tokens. |
 | `auth/guards.ts` | `requireAuth(ctx)` and `requireRole(ctx, role)`. Called first in every protected resolver. |
 | `resolvers/auth.ts` | `me`, `login`, `refreshTokens`, `logout`. |
-| `resolvers/catalog.ts` | `outlets`, `products` queries. |
+| `resolvers/catalog.ts` | `outlets`, `products` queries; `updateProductStock`. |
+| `resolvers/subscriptions.ts` | `orderStatusChanged` (auth + who-may-see-what filter). |
 | `resolvers/orders.ts` | `orders` query, `createOrder`, `updateOrderStatus`, computed order fields. |
 | `services/orders.ts` | The business logic for placing orders and changing status (transactions live here). |
 | `orderStatus.ts` | The status state machine (allowed transitions). |
@@ -102,7 +104,16 @@ input OrderItemInput { productId: ID!  quantity: Int! }
 | `refreshTokens(refreshToken): AuthPayload!` | none | Rotates the refresh token (see above). |
 | `logout(refreshToken): Boolean!` | none | Revokes the refresh token. |
 | `createOrder(outletId, items, clientId): Order!` | REP/ADMIN | Places an order (rules below). `clientId` is optional but should be sent by any client that may retry. |
-| `updateOrderStatus(orderId, status): Order!` | ADMIN | Moves an order along the state machine. |
+| `updateOrderStatus(orderId, status): Order!` | ADMIN | Moves an order along the state machine, then publishes `orderStatusChanged`. |
+| `updateProductStock(productId, stockQuantity): Product!` | ADMIN | Sets stock to an absolute whole number from 0 to 1,000,000 (`BAD_USER_INPUT` otherwise, `NOT_FOUND` for an unknown product). |
+
+### Subscriptions
+
+| Subscription | Auth | Behaviour |
+|---|---|---|
+| `orderStatusChanged(outletId: ID): Order!` | REP/ADMIN | Fires after an order's status changes. Reps receive only their own orders, admins all; `outletId` narrows either. |
+
+See [08-realtime.md](08-realtime.md) for the transport, auth and reconnect rules.
 
 ### Examples (Apollo Sandbox)
 
@@ -157,7 +168,7 @@ stateDiagram-v2
 - Anything else (e.g. `APPROVED → REJECTED`) fails with `BAD_USER_INPUT` and a message listing the allowed next statuses. `REJECTED` and `FULFILLED` are final.
 - The update only applies if the status is still what was read (`CONFLICT` otherwise), so two admins can't both change one order.
 - **Rejecting returns the stock** to the products in the same transaction (stock is deducted at placement).
-- All status changes go through `changeOrderStatus` in `services/orders.ts`. Week 6 will publish the real-time event from there.
+- All status changes go through `changeOrderStatus` in `services/orders.ts`. It publishes `orderStatusChanged` after the transaction commits. `updatedAt` changes with every status change (Prisma's `@updatedAt`), which week 7's charts can use.
 
 ## Testing by hand
 
@@ -170,6 +181,7 @@ Tokens expire after 15 minutes and every re-seed changes all IDs and invalidates
 - No rate limiting, no brute-force lockout on login.
 - CORS is open (`cors()` with no origin list); restrict it before deploying. The web dashboard does not need CORS at all (its server calls the API, not the browser), so only a future browser-side client would.
 - Apollo introspection and the Sandbox landing page are on; disable them in production.
-- No subscriptions yet (week 6). Redis is not used yet.
+- Subscriptions use an in-memory PubSub (single instance only; see `DECISIONS.md`). Redis is not used yet.
+- Stock edits are not logged; there is no history of who changed what.
 - `price`/`total` are `Float` in GraphQL; amounts are exact in the database and in server arithmetic.
 - `clientId` replay returns the original order even if the repeated request's items differ.

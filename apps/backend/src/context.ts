@@ -13,3 +13,10 @@ export function buildContext(req: Request): Context {
   }
   return { auth: null };
 }
+
+// WebSocket connections authenticate once, at connection time, via connectionParams
+// (browsers and RN can't set headers on a WebSocket). The expiry is enforced separately
+// by the server (see index.ts), which closes the socket when the token expires.
+export function buildWsContext(accessToken: unknown): Context {
+  return { auth: typeof accessToken === "string" ? verifyAccessToken(accessToken) : null };
+}

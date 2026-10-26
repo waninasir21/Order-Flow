@@ -2,6 +2,7 @@ import { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import type { AccessPayload } from "../auth/tokens";
 import { canTransition, ALLOWED_TRANSITIONS } from "../orderStatus";
+import { publishOrderStatusChanged } from "../pubsub";
 import {
   badInput,
   conflict,
@@ -145,12 +146,25 @@ async function placeOrderTransaction(
   }, TX_OPTIONS);
 }
 
-// The single place where an order's status changes. In week 6, publish the
-// subscription event here (after the transaction commits).
+// The single place where an order's status changes, and therefore the single place that
+// publishes the subscription event. The publish happens AFTER the transaction commits:
+// publishing inside it could announce a change that then rolls back.
 export async function changeOrderStatus(
   orderId: string,
   to: OrderStatus
 ): Promise<OrderWithRelations> {
+  const order = await applyStatusChange(orderId, to);
+  try {
+    await publishOrderStatusChanged(order);
+  } catch (e) {
+    // The change is already committed; a failed broadcast must not turn a successful
+    // mutation into an error (the client would retry and hit "invalid transition").
+    console.error("Failed to publish orderStatusChanged", e);
+  }
+  return order;
+}
+
+async function applyStatusChange(orderId: string, to: OrderStatus): Promise<OrderWithRelations> {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
