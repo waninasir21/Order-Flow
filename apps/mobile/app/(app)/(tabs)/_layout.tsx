@@ -1,9 +1,9 @@
 import { Tabs } from "expo-router";
 import { Alert, Pressable, Text } from "react-native";
-import { colors } from "@/components/ui";
 import { signOut } from "@/lib/session";
 import { useOutbox } from "@/offline/outbox";
 import { useAuthStore } from "@/stores/auth";
+import { useTheme } from "@/theme/useTheme";
 
 // Orders saved on this phone that the server doesn't have yet (queued, syncing or failed).
 function useUnsyncedCount() {
@@ -12,6 +12,7 @@ function useUnsyncedCount() {
 }
 
 function LogoutButton() {
+  const { colors } = useTheme();
   const unsynced = useUnsyncedCount();
   const confirm = () =>
     Alert.alert(
@@ -25,8 +26,14 @@ function LogoutButton() {
       ]
     );
   return (
-    <Pressable onPress={confirm} hitSlop={8} style={{ paddingHorizontal: 16 }}>
-      <Text style={{ color: colors.primary, fontWeight: "600" }}>Sign out</Text>
+    <Pressable
+      onPress={confirm}
+      hitSlop={8}
+      style={{ paddingHorizontal: 16, minHeight: 44, justifyContent: "center" }}
+      accessibilityRole="button"
+      accessibilityLabel="Sign out"
+    >
+      <Text style={{ color: colors.accent, fontWeight: "600" }}>Sign out</Text>
     </Pressable>
   );
 }
@@ -34,8 +41,15 @@ function LogoutButton() {
 export default function TabsLayout() {
   const name = useAuthStore((s) => s.employee?.name);
   const unsynced = useUnsyncedCount();
+  const { colors } = useTheme();
   return (
-    <Tabs screenOptions={{ headerRight: () => <LogoutButton />, tabBarActiveTintColor: colors.primary }}>
+    <Tabs
+      screenOptions={{
+        headerRight: () => <LogoutButton />,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.muted,
+      }}
+    >
       <Tabs.Screen name="index" options={{ title: name ? `Outlets · ${name}` : "Outlets", tabBarLabel: "Outlets" }} />
       <Tabs.Screen
         name="orders"
@@ -43,6 +57,8 @@ export default function TabsLayout() {
           title: "My orders",
           tabBarLabel: "Orders",
           tabBarBadge: unsynced > 0 ? unsynced : undefined, // how many are waiting to sync
+          tabBarAccessibilityLabel:
+            unsynced > 0 ? `Orders, ${unsynced} waiting to sync` : "Orders",
         }}
       />
     </Tabs>

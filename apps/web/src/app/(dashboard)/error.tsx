@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { startTransition } from "react";
+import { AlertIcon } from "@/components/icons";
 
 // In production Next hides server error messages from the browser, so this stays generic.
 // The most likely cause is the backend being unreachable (stopped, or Neon waking up).
@@ -20,6 +21,9 @@ export default function DashboardError({ reset }: { error: Error; reset: () => v
 
   return (
     <div role="alert" className="mx-auto max-w-md rounded-xl border border-line bg-surface p-8 text-center">
+      <span aria-hidden className="mx-auto mb-3 grid size-14 place-items-center rounded-full bg-danger-soft text-danger">
+        <AlertIcon />
+      </span>
       <h1 className="text-lg font-semibold">Couldn&apos;t load this page</h1>
       <p className="mt-2 text-sm text-muted">
         The server may be unreachable or still waking up. Your session is still active.

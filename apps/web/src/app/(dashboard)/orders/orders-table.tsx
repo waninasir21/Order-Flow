@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SearchIcon } from "@/components/icons";
+import { EmptyState } from "@/components/empty-state";
 import { OrderActions } from "@/components/order-actions";
 import { StatusBadge } from "@/components/status-badge";
 import { STATUSES, STATUS_LABEL, formatDateTime, formatMoney, shortId } from "@/lib/format";
@@ -208,7 +209,12 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-muted">{formatDateTime(o.createdAt)}</td>
                 <td className="px-4 py-3">
-                  <OrderActions status={o.status} disabled={pending} onChange={(to) => change(o.id, to)} />
+                  <OrderActions
+                    status={o.status}
+                    disabled={pending}
+                    onChange={(to) => change(o.id, to)}
+                    orderLabel={shortId(o.id)}
+                  />
                 </td>
               </tr>
             ))}
@@ -216,11 +222,19 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
         </table>
 
         {visible.length === 0 ? (
-          <p className="px-4 py-12 text-center text-sm text-muted">
-            {orders.length === 0
-              ? "No orders have been placed yet."
-              : "No orders match these filters."}
-          </p>
+          orders.length === 0 ? (
+            <EmptyState
+              title="No orders yet"
+              description="Orders placed from the field app will appear here, newest first, ready for you to approve or reject."
+            />
+          ) : (
+            <EmptyState
+              icon={<SearchIcon />}
+              title="No orders match these filters"
+              description="Try a different status or a shorter search."
+              action={{ label: "Clear filters", onClick: () => setFilters(DEFAULTS) }}
+            />
+          )
         ) : null}
       </div>
 

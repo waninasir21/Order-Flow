@@ -3,13 +3,17 @@ import { Redirect } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, colors } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { LOGIN } from "@/graphql/operations";
 import type { LoginData } from "@/graphql/types";
 import { describeError } from "@/lib/errors";
 import { useAuthStore } from "@/stores/auth";
+import { useThemedStyles, useTheme } from "@/theme/useTheme";
+import type { Palette } from "@/theme/tokens";
 
 export default function LoginScreen() {
+  const styles = useThemedStyles(createStyles);
+  const { colors: theme } = useTheme();
   const hydrated = useAuthStore((s) => s.hydrated);
   const signedIn = useAuthStore((s) => !!s.refreshToken && !!s.employee);
   const setSession = useAuthStore((s) => s.setSession);
@@ -48,6 +52,10 @@ export default function LoginScreen() {
           <TextInput
             style={styles.input}
             placeholder="Phone number"
+            placeholderTextColor={theme.muted}
+            accessibilityLabel="Phone number"
+            textContentType="telephoneNumber"
+            autoComplete="tel"
             keyboardType="phone-pad"
             autoCapitalize="none"
             value={phone}
@@ -56,13 +64,21 @@ export default function LoginScreen() {
           <TextInput
             style={styles.input}
             placeholder="Password"
+            placeholderTextColor={theme.muted}
+            accessibilityLabel="Password"
+            textContentType="password"
+            autoComplete="password"
             secureTextEntry
             autoCapitalize="none"
             value={password}
             onChangeText={setPassword}
             onSubmitEditing={submit}
           />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? (
+            <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              {error}
+            </Text>
+          ) : null}
           <Button
             title="Sign in"
             onPress={submit}
@@ -75,14 +91,16 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, justifyContent: "center", padding: 24 },
   title: { fontSize: 32, fontWeight: "800", color: colors.text },
   subtitle: { color: colors.muted, marginTop: 4, marginBottom: 28, fontSize: 15 },
   form: { gap: 12 },
   input: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
+    color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
@@ -91,4 +109,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   error: { color: colors.danger, fontSize: 14 },
-});
+  });

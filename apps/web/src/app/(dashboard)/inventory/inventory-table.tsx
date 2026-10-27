@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EmptyState } from "@/components/empty-state";
 import { SearchIcon } from "@/components/icons";
 import { LOW_STOCK_THRESHOLD, formatMoney } from "@/lib/format";
 import { MAX_STOCK, parseStock } from "@/lib/stock";
@@ -133,9 +134,25 @@ export function InventoryTable({ products: serverProducts }: { products: Product
           </tbody>
         </table>
         {rows.length === 0 ? (
-          <p className="px-4 py-12 text-center text-sm text-muted">
-            {products.length === 0 ? "No products yet." : "No products match these filters."}
-          </p>
+          products.length === 0 ? (
+            <EmptyState
+              title="No products yet"
+              description="Add products to the catalog (the seed script does this for the demo data) and their stock levels will show up here."
+            />
+          ) : (
+            <EmptyState
+              icon={<SearchIcon />}
+              title="No products match these filters"
+              description="Try a different name or SKU, or turn off “Low stock only”."
+              action={{
+                label: "Clear filters",
+                onClick: () => {
+                  setQ("");
+                  setLowOnly(false);
+                },
+              }}
+            />
+          )
         ) : null}
       </div>
     </section>

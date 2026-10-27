@@ -100,6 +100,8 @@ npm run dev                      # http://localhost:3000, sign in as 9900000001 
 | `apps/web` | `npm run dev` | Next.js dev server (Turbopack) on port 3000 |
 | `apps/web` | `npm run typecheck` | `next typegen` then `tsc --noEmit` |
 | `apps/web` | `npm run lint` | ESLint |
+| `apps/backend`, `apps/mobile` | `npm run lint` | ESLint (added in week 7) |
+| repo root | `npm run check` | typecheck and lint for every app (what the commit hook runs) |
 | `apps/web` | `npm run build` | production build (also typechecks) |
 | `apps/web` | `npm start` | serve the production build (run `build` first) |
 
@@ -158,4 +160,4 @@ second run with unchanged code takes a few seconds (a cold run takes about 40).
 - Run the same checks by hand: `npm run check` (or `npm run typecheck`, `npm run lint`).
 - The hook is installed by `npm install` (the root `prepare` script runs `husky`). After cloning, run `npm install` once.
 - Emergency bypass: `git commit --no-verify`. Use it rarely; a red commit is a red commit.
-- Only the web app has a linter so far; backend and mobile are covered by typecheck only.
+- All three apps have a linter (backend and mobile gained one in week 7), so the hook checks types and lint everywhere.

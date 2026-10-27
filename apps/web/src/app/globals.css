@@ -30,8 +30,12 @@
   --rejected-bg: #fbdcd8; --rejected-fg: #9b2418;
 }
 
+/* Dark palette. Applied in two cases: the person picked "Dark" (data-theme="dark", set by the
+   toggle), or they have not chosen and their system is dark. Picking "Light" wins over a dark
+   system because of the :not([data-theme="light"]). The same values appear twice because CSS
+   can't share a block between a media query and an attribute selector. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0e1311;
     --surface: #161d1a;
     --ink: #e8eee9;
@@ -56,7 +60,40 @@
     --approved-bg: #14263f; --approved-fg: #8db8f5;
     --fulfilled-bg: #123123; --fulfilled-fg: #7fd6a1;
     --rejected-bg: #3a1c19; --rejected-fg: #f4a198;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e1311;
+  --surface: #161d1a;
+  --ink: #e8eee9;
+  --muted: #93a097;
+  --line: #25302a;
+  --line-strong: #34423a;
+  --accent: #4fb99b;
+  --accent-soft: #17302a;
+  --accent-ink: #052018;
+  --danger: #f08c82;
+  --danger-soft: #3a1c19;
+  --warn: #e9b44c;
+  --warn-soft: #33270c;
+
+  --side: #0a0f0d;
+  --side-ink: #e1e9e3;
+  --side-muted: #7f9288;
+  --side-line: #1b2721;
+  --side-active: #15211b;
+
+  --placed-bg: #33270c;   --placed-fg: #f1c364;
+  --approved-bg: #14263f; --approved-fg: #8db8f5;
+  --fulfilled-bg: #123123; --fulfilled-fg: #7fd6a1;
+  --rejected-bg: #3a1c19; --rejected-fg: #f4a198;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 @theme inline {

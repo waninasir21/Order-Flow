@@ -79,6 +79,7 @@ lib/
 | `/orders` | orders table (filter, search, sort, pagination) |
 | `/orders/[id]` | one order: line items, outlet, rep, timeline |
 | `/inventory` | products with stock levels and low-stock badges |
+| `/analytics` | summary cards, orders-per-day line chart, best-sellers bar chart; `?days=7`, `14` or `30` |
 | `/auth/expired` | not a page: clears the cookies and redirects to `/login` |
 
 ## Authentication and session
@@ -195,6 +196,31 @@ The optimistic update uses React's `useOptimistic` inside a transition (`use-ord
 The week's doc says "update the Apollo cache"; the dashboard has no Apollo on purpose (see
 `DECISIONS.md`), so `useOptimistic` plays that role.
 
+## Analytics (`/analytics`, week 7)
+
+Four cards (orders this week, pending approvals, low stock, out of stock; the last three link to the
+list that fixes them), a line chart of orders per day with a 7 / 14 / 30 day switch (the choice is in
+the URL), and a bar chart of best-selling products. All numbers come from the backend's
+`ordersPerDay`, `topProducts` and `analyticsSummary` (aggregated in the database, see
+[03-backend-api.md](03-backend-api.md)); the page only draws them. When a range has no orders the chart
+is replaced by an empty state. The charts (`components/charts.tsx`) are Recharts, read their colors
+from the CSS tokens so they follow the theme, are hidden from screen readers in favour of an
+equivalent visually-hidden data table, and shorten long product names on the axis.
+
+## Dark mode, empty states and errors (week 7)
+
+- **Theme toggle** (header): cycles System, Light, Dark; announces the current choice and what a press
+  does. Stored in `localStorage` under `of-theme`; applied as `<html data-theme>` by a script in
+  `<head>` before the first paint. "System" means no attribute and follows the OS.
+- **Empty states** (`components/empty-state.tsx`): no orders, no orders matching the filters, no
+  products, no sales, an empty range, and the 404 page; each says what to do next.
+- **Errors:** `(dashboard)/error.tsx` (a page's data failed: message plus Try again, session kept),
+  `app/global-error.tsx` (the root layout itself failed), `app/not-found.tsx` (unknown URL).
+- **Accessibility:** a "Skip to content" link is the first Tab stop; every interactive element shows a
+  focus outline; form fields have associated labels; icons are decorative (`aria-hidden`) and icon-only
+  buttons carry labels; current page and current range use `aria-current`. axe-core reports no
+  violations on any page in either theme.
+
 ## Formatting
 
 `lib/format.ts` pins one locale (`en-IN`) **and one time zone (`Asia/Kolkata`)**, so the server render and the browser render produce identical text. A time zone that differs between server and browser would cause hydration mismatches. Money is formatted as INR (₹1,484.00).
@@ -205,7 +231,7 @@ Tokens (colors) are CSS variables in `globals.css`, with a light palette and a d
 `prefers-color-scheme`; nothing else hard-codes a color. Status colors match the mobile app (placed
 amber, approved blue, fulfilled green, rejected red). The sidebar is a fixed 232 px column on wide
 screens and a top bar on phones; the orders table scrolls inside its own box on narrow screens
-instead of scrolling the whole page. Week 7 owns the dark-mode polish pass.
+instead of scrolling the whole page. Dark mode is described under "Dark mode, empty states and errors" above.
 
 ## How it was tested
 
@@ -234,6 +260,11 @@ flight and exactly one mutation sent; rollback to Placed with the backend's mess
 Approve for Mark fulfilled; stock edit rejects negatives, saves 7, shows the low-stock badge,
 Escape closes the editor, and a refused edit rolls back. No browser console errors.
 
+Week 7 added 22 browser checks for the analytics page (both charts, range switching, the theme
+toggle, chart colors changing with the theme, the choice surviving a reload, following a dark OS, no
+sideways scroll at 390 px, the skip link and focus outline, empty and error states, the 404 page), an
+axe-core scan of every page in light and dark (zero violations), and a re-run of the 18 week-6 checks.
+
 ### The week 5 milestone test (you run this)
 
 1. Backend running (`apps\backend`, `npm run dev`), then `apps\web`, `npm run dev`.
@@ -253,5 +284,6 @@ Escape closes the editor, and a refused edit rolls back. No browser console erro
 - **`price` and `total` arrive as `Float`.** Line totals are re-computed in paise on the page; the displayed order total is the backend's value.
 - **No rate limiting or lockout** on login (it's on the backend's list too).
 - **Cookies over plain http on a LAN address:** production builds mark cookies `Secure`, which a browser only accepts on `https` or `localhost`. Use `COOKIE_SECURE="false"` only for such local tests.
+- **Analytics are not live:** they are computed when the page loads (Refresh the page, or switch the range).
 - **Not live.** The dashboard reflects its own actions immediately but not another admin's until a reload. Making it live without exposing the httpOnly token needs a server-side stream (see `DECISIONS.md`).
 - **No audit trail.** Neither status changes nor stock edits record who made them.

@@ -18,6 +18,7 @@ Prisma (see [02-database-prisma.md](02-database-prisma.md)). Schema is written a
 | `auth/guards.ts` | `requireAuth(ctx)` and `requireRole(ctx, role)`. Called first in every protected resolver. |
 | `resolvers/auth.ts` | `me`, `login`, `refreshTokens`, `logout`. |
 | `resolvers/catalog.ts` | `outlets`, `products` queries; `updateProductStock`. |
+| `resolvers/analytics.ts`, `services/analytics.ts` | The analytics queries; the aggregation SQL lives in the service (`ordersPerDaySql`). |
 | `resolvers/subscriptions.ts` | `orderStatusChanged` (auth + who-may-see-what filter). |
 | `resolvers/orders.ts` | `orders` query, `createOrder`, `updateOrderStatus`, computed order fields. |
 | `services/orders.ts` | The business logic for placing orders and changing status (transactions live here). |
@@ -94,6 +95,9 @@ input OrderItemInput { productId: ID!  quantity: Int! }
 | `outlets` | any | Outlets (REP: assigned only), oldest first. |
 | `products` | any | All products, oldest first. |
 | `orders(outletId: ID, status: OrderStatus)` | any | Orders, newest first. REP sees only their own. Filters are optional. |
+| `ordersPerDay(days: Int = 14): [DailyOrders!]!` | ADMIN | One row per day for the last `days` days (1 to 90, today included), `{ date: "YYYY-MM-DD", count }`, zero for days with no orders. Days are Indian days (`ANALYTICS_TIME_ZONE`, default `Asia/Kolkata`). |
+| `topProducts(limit: Int = 5): [TopProduct!]!` | ADMIN | Best sellers by units ordered (1 to 20), rejected orders excluded: `{ product, totalQuantityOrdered }`. |
+| `analyticsSummary: AnalyticsSummary!` | ADMIN | `ordersThisWeek` (sum of the last 7 days), `pendingApprovals` (`PLACED`), `lowStockProducts` (1 to 9 left), `outOfStockProducts` (0). |
 | `order(id: ID!)` | any | One order with its outlet, rep and line items (added in week 5 for the dashboard's detail page). A REP asking for another rep's order gets `NOT_FOUND`, not `FORBIDDEN`, so the API never confirms that someone else's order id exists. |
 
 ### Mutations
