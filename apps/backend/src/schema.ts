@@ -1,4 +1,5 @@
 import { authMutations, authQueries } from "./resolvers/auth";
+import { analyticsQueries } from "./resolvers/analytics";
 import { catalogMutations, catalogQueries, productFields } from "./resolvers/catalog";
 import { subscriptions } from "./resolvers/subscriptions";
 import { makeExecutableSchema } from "@graphql-tools/schema";
@@ -59,6 +60,26 @@ export const typeDefs = /* GraphQL */ `#graphql
     updatedAt: String!
   }
 
+  type DailyOrders {
+    # YYYY-MM-DD in the business time zone (Asia/Kolkata by default)
+    date: String!
+    count: Int!
+  }
+
+  type TopProduct {
+    product: Product!
+    totalQuantityOrdered: Int!
+  }
+
+  type AnalyticsSummary {
+    # Orders placed in the last 7 days, today included (the sum of ordersPerDay(days: 7))
+    ordersThisWeek: Int!
+    pendingApprovals: Int!
+    # 1-9 units left
+    lowStockProducts: Int!
+    outOfStockProducts: Int!
+  }
+
   type AuthPayload {
     accessToken: String!
     refreshToken: String!
@@ -76,6 +97,12 @@ export const typeDefs = /* GraphQL */ `#graphql
     products: [Product!]!
     orders(outletId: ID, status: OrderStatus): [Order!]!
     order(id: ID!): Order!
+    # ADMIN only. One row per day (zeros included), oldest first. days: 1-90.
+    ordersPerDay(days: Int = 14): [DailyOrders!]!
+    # ADMIN only. Best sellers by units, rejected orders excluded. limit: 1-20.
+    topProducts(limit: Int = 5): [TopProduct!]!
+    # ADMIN only.
+    analyticsSummary: AnalyticsSummary!
   }
 
   type Mutation {
@@ -98,7 +125,7 @@ export const typeDefs = /* GraphQL */ `#graphql
 `;
 
 export const resolvers = {
-  Query: { ...authQueries, ...catalogQueries, ...orderQueries },
+  Query: { ...authQueries, ...catalogQueries, ...orderQueries, ...analyticsQueries },
   Mutation: { ...authMutations, ...orderMutations, ...catalogMutations },
   Subscription: subscriptions,
   Product: productFields,

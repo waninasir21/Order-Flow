@@ -96,6 +96,22 @@ export const UPDATE_PRODUCT_STOCK = /* GraphQL */ `
   }
 `;
 
+export const ANALYTICS = /* GraphQL */ `
+  query Analytics($days: Int!, $limit: Int!) {
+    analyticsSummary {
+      ordersThisWeek
+      pendingApprovals
+      lowStockProducts
+      outOfStockProducts
+    }
+    ordersPerDay(days: $days) { date count }
+    topProducts(limit: $limit) {
+      totalQuantityOrdered
+      product { id name sku }
+    }
+  }
+`;
+
 export interface Me { id: string; name: string; phone: string; role: Role }
 
 export interface LoginData {
@@ -139,4 +155,15 @@ export interface OrderData {
 
 export interface ProductsData {
   products: { id: string; name: string; sku: string; price: number; stockQuantity: number }[];
+}
+
+export interface AnalyticsData {
+  analyticsSummary: {
+    ordersThisWeek: number;
+    pendingApprovals: number;
+    lowStockProducts: number;
+    outOfStockProducts: number;
+  };
+  ordersPerDay: { date: string; count: number }[];
+  topProducts: { totalQuantityOrdered: number; product: { id: string; name: string; sku: string } }[];
 }

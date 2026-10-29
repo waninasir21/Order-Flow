@@ -2,12 +2,14 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { formatMoney } from "@/lib/errors";
 import { useOutbox, type PendingOrder, type SyncStatus } from "@/offline/outbox";
 import { syncOutbox } from "@/offline/sync";
-import { Button, Card, colors } from "./ui";
+import { Button, Card } from "./ui";
+import { useThemedStyles, useTheme } from "@/theme/useTheme";
+import type { Palette } from "@/theme/tokens";
 
-const BADGES: Record<SyncStatus, { label: string; bg: string; fg: string }> = {
-  PENDING: { label: "Waiting to sync", bg: "#e5e7eb", fg: "#374151" },
-  SYNCING: { label: "Syncing…", bg: "#dbeafe", fg: "#1e40af" },
-  FAILED: { label: "Sync failed", bg: "#fee2e2", fg: "#991b1b" },
+const LABELS: Record<SyncStatus, string> = {
+  PENDING: "Waiting to sync",
+  SYNCING: "Syncing…",
+  FAILED: "Sync failed",
 };
 
 // An order that lives only on this phone so far. Three states, matching the doc:
@@ -19,7 +21,17 @@ export function PendingOrderCard({
   pending: PendingOrder;
   showOutlet?: boolean;
 }) {
-  const badge = BADGES[pending.syncStatus];
+  const styles = useThemedStyles(createStyles);
+  const { colors: theme } = useTheme();
+  const badge = {
+    label: LABELS[pending.syncStatus],
+    // Same colors as the order statuses: neutral while waiting, blue while sending, red on failure.
+    ...(pending.syncStatus === "PENDING"
+      ? { bg: theme.border, fg: theme.text }
+      : pending.syncStatus === "SYNCING"
+        ? theme.status.APPROVED
+        : theme.status.REJECTED),
+  };
   const itemCount = pending.items.reduce((n, i) => n + i.quantity, 0);
 
   const retry = async () => {
@@ -47,7 +59,11 @@ export function PendingOrderCard({
     <Card>
       <View style={styles.top}>
         <Text style={styles.title}>{showOutlet ? pending.outletName : "Order on this phone"}</Text>
-        <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+        <View
+          style={[styles.badge, { backgroundColor: badge.bg }]}
+          accessible
+          accessibilityLabel={`Sync status: ${badge.label}`}
+        >
           <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
         </View>
       </View>
@@ -64,7 +80,7 @@ export function PendingOrderCard({
 
       {pending.syncStatus === "PENDING" ? (
         <>
-          <Text style={styles.note}>Saved on this phone. It will be sent when you're back online.</Text>
+          <Text style={styles.note}>Saved on this phone. It will be sent when you&apos;re back online.</Text>
           <View style={styles.actions}>
             <View style={styles.action}>
               <Button
@@ -102,7 +118,8 @@ export function PendingOrderCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
   top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   title: { fontSize: 16, fontWeight: "600", color: colors.text, flexShrink: 1 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
@@ -115,4 +132,4 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 14, marginTop: 10 },
   actions: { flexDirection: "row", gap: 10, marginTop: 12 },
   action: { flex: 1 },
-});
+  });

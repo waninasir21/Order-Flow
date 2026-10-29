@@ -3,14 +3,17 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, EmptyState, ErrorState, Loading, colors } from "@/components/ui";
+import { Button, EmptyState, ErrorState, Loading } from "@/components/ui";
 import { OUTLETS, PRODUCTS } from "@/graphql/operations";
 import type { Outlet, Product } from "@/graphql/types";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
 import { describeError, errorCode, formatMoney } from "@/lib/errors";
 import { useNetworkStore } from "@/offline/network";
+import { useThemedStyles } from "@/theme/useTheme";
+import type { Palette } from "@/theme/tokens";
 
 export default function PlaceOrderScreen() {
+  const styles = useThemedStyles(createStyles);
   const { outletId } = useLocalSearchParams<{ outletId: string }>();
   const router = useRouter();
   const offline = useNetworkStore((s) => !s.online);
@@ -30,7 +33,7 @@ export default function PlaceOrderScreen() {
   // the screen closes. (A Zustand cart would only be worth it if several screens shared it.)
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const products = data?.products ?? [];
+  const products = useMemo(() => data?.products ?? [], [data]);
 
   const { lineCount, total } = useMemo(() => {
     let sum = 0;
@@ -102,7 +105,7 @@ export default function PlaceOrderScreen() {
         contentContainerStyle={styles.content}
         data={products}
         keyExtractor={(p) => p.id}
-        ListEmptyComponent={<EmptyState message="No products available." />}
+        ListEmptyComponent={<EmptyState title="No products" message="There are no products to order right now. Pull back and try again later." />}
         renderItem={({ item }) => {
           const qty = quantities[item.id] ?? 0;
           const soldOut = item.stockQuantity === 0;
@@ -119,14 +122,24 @@ export default function PlaceOrderScreen() {
                   style={[styles.stepBtn, qty === 0 && styles.stepDisabled]}
                   onPress={() => change(item, -1)}
                   disabled={qty === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Decrease ${item.name}`}
+                  accessibilityState={{ disabled: qty === 0 }}
+                  hitSlop={6}
                 >
                   <Text style={styles.stepText}>−</Text>
                 </Pressable>
-                <Text style={styles.qty}>{qty}</Text>
+                <Text style={styles.qty} accessibilityLabel={`${qty} of ${item.name}`}>
+                  {qty}
+                </Text>
                 <Pressable
                   style={[styles.stepBtn, (soldOut || qty >= item.stockQuantity) && styles.stepDisabled]}
                   onPress={() => change(item, 1)}
                   disabled={soldOut || qty >= item.stockQuantity}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Increase ${item.name}`}
+                  accessibilityState={{ disabled: soldOut || qty >= item.stockQuantity }}
+                  hitSlop={6}
                 >
                   <Text style={styles.stepText}>+</Text>
                 </Pressable>
@@ -137,7 +150,7 @@ export default function PlaceOrderScreen() {
       />
       <View style={styles.footer}>
         {offline ? (
-          <Text style={styles.offline}>Offline: this order will be saved and sent when you're back online.</Text>
+          <Text style={styles.offline}>Offline: this order will be saved and sent when you&apos;re back online.</Text>
         ) : null}
         <Text style={styles.total}>
           {lineCount} product{lineCount === 1 ? "" : "s"} · {formatMoney(total)}
@@ -148,14 +161,15 @@ export default function PlaceOrderScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   list: { flex: 1 },
   content: { padding: 16, gap: 10, flexGrow: 1 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
@@ -170,20 +184,20 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
   stepDisabled: { opacity: 0.3 },
-  stepText: { color: "#fff", fontSize: 20, fontWeight: "700", lineHeight: 22 },
-  qty: { minWidth: 22, textAlign: "center", fontSize: 16, fontWeight: "600" },
+  stepText: { color: colors.accentInk, fontSize: 20, fontWeight: "700", lineHeight: 22 },
+  qty: { minWidth: 22, textAlign: "center", fontSize: 16, fontWeight: "600", color: colors.text },
   footer: {
     padding: 16,
     gap: 10,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
   },
   total: { fontSize: 16, fontWeight: "700", color: colors.text, textAlign: "center" },
-  offline: { color: "#92400e", backgroundColor: "#fef3c7", padding: 8, borderRadius: 8, textAlign: "center", fontSize: 13 },
-});
+  offline: { color: colors.warn.fg, backgroundColor: colors.warn.bg, padding: 8, borderRadius: 8, textAlign: "center", fontSize: 13 },
+  });

@@ -1,11 +1,4 @@
-import {
-  ApolloClient,
-  HttpLink,
-  InMemoryCache,
-  Observable,
-  from,
-  split,
-} from "@apollo/client";
+import { ApolloClient, HttpLink, InMemoryCache, Observable, from, split } from "@apollo/client";
 import type { FetchResult } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
@@ -22,12 +15,7 @@ const httpLink = new HttpLink({ uri: API_URL });
 // picked up automatically (including when the error link retries an operation).
 const authLink = setContext((_, { headers }) => {
   const token = useAuthStore.getState().accessToken;
-  return {
-    headers: {
-      ...headers,
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    },
-  };
+  return { headers: { ...headers, ...(token ? { authorization: `Bearer ${token}` } : {}) } };
 });
 
 // Refresh tokens are single-use on the server, so two parallel refreshes would
@@ -61,9 +49,7 @@ async function doRefresh(): Promise<boolean> {
       }),
     });
     const json = (await res.json()) as {
-      data?: {
-        refreshTokens?: { accessToken: string; refreshToken: string };
-      } | null;
+      data?: { refreshTokens?: { accessToken: string; refreshToken: string } } | null;
     };
     const tokens = json.data?.refreshTokens;
     if (!tokens) {
@@ -80,9 +66,7 @@ async function doRefresh(): Promise<boolean> {
 }
 
 const errorLink = onError(({ graphQLErrors, operation, forward }) => {
-  const unauthenticated = graphQLErrors?.some(
-    (e) => e.extensions?.code === "UNAUTHENTICATED",
-  );
+  const unauthenticated = graphQLErrors?.some((e) => e.extensions?.code === "UNAUTHENTICATED");
   // Login failures are also UNAUTHENTICATED ("wrong password"); never refresh for those.
   if (!unauthenticated || operation.operationName === "Login") return;
   // Retry each operation at most once.
@@ -115,10 +99,7 @@ function accessTokenExpiresSoon(token: string): boolean {
     if (!payload) return true;
     const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
     const { exp } = JSON.parse(json) as { exp?: number };
-    return (
-      typeof exp !== "number" ||
-      exp * 1000 - Date.now() < EXPIRY_MARGIN_S * 1000
-    );
+    return typeof exp !== "number" || exp * 1000 - Date.now() < EXPIRY_MARGIN_S * 1000;
   } catch {
     return true;
   }
@@ -144,10 +125,7 @@ const wsClient = createClient({
   retryAttempts: Infinity,
   retryWait: (retries) =>
     new Promise((resolve) =>
-      setTimeout(
-        resolve,
-        Math.min(300 * 2 ** retries, 15_000) + Math.random() * 500,
-      ),
+      setTimeout(resolve, Math.min(300 * 2 ** retries, 15_000) + Math.random() * 500)
     ),
 });
 
@@ -157,13 +135,10 @@ wsClient.on("connected", () => {
   // Only if the Orders screen's query is alive right now. Asking for a query that isn't
   // active makes Apollo warn; and if it isn't active nothing is stale, because the screen
   // fetches fresh data (cache-and-network) the next time it opens.
-  const ordersActive = [
-    ...apolloClient.getObservableQueries("active").values(),
-  ].some((q) => q.queryName === "Orders");
-  if (ordersActive)
-    void apolloClient
-      .refetchQueries({ include: ["Orders"] })
-      .catch(() => undefined);
+  const ordersActive = [...apolloClient.getObservableQueries("active").values()].some(
+    (q) => q.queryName === "Orders"
+  );
+  if (ordersActive) void apolloClient.refetchQueries({ include: ["Orders"] }).catch(() => undefined);
 });
 
 const wsLink = new GraphQLWsLink(wsClient);
@@ -172,12 +147,10 @@ const wsLink = new GraphQLWsLink(wsClient);
 const transportLink = split(
   ({ query }) => {
     const def = getMainDefinition(query);
-    return (
-      def.kind === "OperationDefinition" && def.operation === "subscription"
-    );
+    return def.kind === "OperationDefinition" && def.operation === "subscription";
   },
   wsLink,
-  from([errorLink, authLink, httpLink]),
+  from([errorLink, authLink, httpLink])
 );
 
 export const apolloClient = new ApolloClient({

@@ -1,25 +1,34 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { Order, OrderStatus } from "@/graphql/types";
 import { formatMoney } from "@/lib/errors";
-import { Card, colors } from "./ui";
+import { useTheme, useThemedStyles } from "@/theme/useTheme";
+import type { Palette } from "@/theme/tokens";
+import { Card } from "./ui";
 
-const STATUS_COLORS: Record<OrderStatus, { bg: string; fg: string }> = {
-  PLACED: { bg: "#fef3c7", fg: "#92400e" },
-  APPROVED: { bg: "#dbeafe", fg: "#1e40af" },
-  FULFILLED: { bg: "#dcfce7", fg: "#166534" },
-  REJECTED: { bg: "#fee2e2", fg: "#991b1b" },
+const LABEL: Record<OrderStatus, string> = {
+  PLACED: "Placed",
+  APPROVED: "Approved",
+  FULFILLED: "Fulfilled",
+  REJECTED: "Rejected",
 };
 
 export function StatusBadge({ status }: { status: OrderStatus }) {
-  const c = STATUS_COLORS[status];
+  const styles = useThemedStyles(createStyles);
+  const { colors } = useTheme();
+  const c = colors.status[status];
   return (
-    <View style={[styles.badge, { backgroundColor: c.bg }]}>
+    <View
+      style={[styles.badge, { backgroundColor: c.bg }]}
+      accessible
+      accessibilityLabel={`Status: ${LABEL[status]}`}
+    >
       <Text style={[styles.badgeText, { color: c.fg }]}>{status}</Text>
     </View>
   );
 }
 
 export function OrderRow({ order, showOutlet = true }: { order: Order; showOutlet?: boolean }) {
+  const styles = useThemedStyles(createStyles);
   const itemCount = order.items.reduce((n, i) => n + i.quantity, 0);
   return (
     <Card>
@@ -40,7 +49,8 @@ export function OrderRow({ order, showOutlet = true }: { order: Order; showOutle
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
   top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   title: { fontSize: 16, fontWeight: "600", color: colors.text, flexShrink: 1 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
@@ -49,4 +59,4 @@ const styles = StyleSheet.create({
   bottom: { flexDirection: "row", justifyContent: "space-between", marginTop: 10, gap: 8 },
   muted: { color: colors.muted, fontSize: 12, flexShrink: 1 },
   total: { fontWeight: "700", color: colors.text },
-});
+  });

@@ -10,6 +10,11 @@ const dateOnly = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZon
 
 export const formatMoney = (value: number) => money.format(value);
 export const formatDateTime = (iso: string) => dateTime.format(new Date(iso));
+// "2026-10-26" -> "26 Oct". The backend sends calendar days that are already in the business
+// time zone, so this formats them as plain dates (UTC) and never shifts them.
+const dayLabel = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+export const formatDay = (isoDay: string) => dayLabel.format(new Date(`${isoDay}T00:00:00Z`));
+
 export const formatDate = (iso: string) => dateOnly.format(new Date(iso));
 
 // Same short id the mobile app shows (last six characters).

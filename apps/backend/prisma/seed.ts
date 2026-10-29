@@ -4,8 +4,10 @@ import { PrismaClient, Role } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Dev-only known password for every seeded employee. Never reuse in production.
-const DEV_PASSWORD = "password123";
+// One known password for every seeded employee. Fine for local development; for a public demo
+// deployment set SEED_PASSWORD, and never seed a database that holds real data: this script
+// DELETES every order, product, employee and outlet first.
+const DEV_PASSWORD = process.env.SEED_PASSWORD ?? "password123";
 
 async function main() {
   // Wipe in FK-safe order, then re-insert. (Refresh tokens cascade-delete with employees.)

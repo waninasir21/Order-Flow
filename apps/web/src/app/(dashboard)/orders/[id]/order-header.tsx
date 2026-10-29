@@ -18,7 +18,12 @@ export function OrderHeader({ orderId, title, status }: { orderId: string; title
           <h1 className="font-mono text-2xl font-semibold tracking-tight">{title}</h1>
           <StatusBadge status={current} />
         </div>
-        <OrderActions status={current} disabled={pending} onChange={(to) => change(orderId, to)} />
+        <OrderActions
+          status={current}
+          disabled={pending}
+          onChange={(to) => change(orderId, to)}
+          orderLabel={title}
+        />
       </div>
       {error ? <ErrorBanner message={error} onDismiss={dismissError} /> : null}
     </div>

@@ -143,3 +143,14 @@ Run `npm install` at the repo root; week 6 added `graphql-ws`, `graphql-subscrip
 
 **Metro: `Failed to start watch mode` or `Cannot read properties of undefined (reading 'get')` (DependencyGraph)**
 Metro's file watcher didn't become ready within 4 minutes. Stop all node processes, delete `apps\web\.next`, keep `apps\mobile\metro.config.js` (it stops Metro watching the web app and backend), and if it persists exclude the project folder from Windows Defender real-time scanning.
+
+## Analytics and themes (week 7)
+
+**Analytics shows zeros, or a day's bar looks wrong**
+Days are Indian days (`Asia/Kolkata`); orders are counted on the IST date they were placed. Set `ANALYTICS_TIME_ZONE` in `apps/backend/.env` to use another zone. An empty chart with the message "No orders in this period" is correct when nothing was placed in that range; try 30 days.
+
+**Charts are the wrong color after switching theme**
+They read the theme's colors when it changes; if they look stale, hard-refresh. A saved choice lives in the browser's local storage (`of-theme`); clear it to go back to following the system.
+
+**The phone stays light (or dark) when I flip the system setting**
+The app follows the phone's system setting, live. Check the phone isn't set to "Auto" with a schedule, and that Expo Go itself isn't forcing a mode.

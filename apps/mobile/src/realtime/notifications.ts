@@ -1,3 +1,4 @@
+import { requireOptionalNativeModule } from "expo";
 import { Platform } from "react-native";
 import type { Order } from "@/graphql/types";
 import { formatMoney } from "@/lib/errors";
@@ -16,6 +17,16 @@ let cached: NotificationsModule | null | undefined;
 function getNotifications(): NotificationsModule | null {
   if (cached !== undefined) return cached;
   if (Platform.OS === "web") return (cached = null);
+
+  // Look for the native module BEFORE loading the package. requireOptionalNativeModule returns
+  // null when it is missing instead of throwing. This matters because Metro reports an error
+  // thrown while a module is loading (the dev overlay shows it) even when the caller catches
+  // it, so "try to load it and catch" still produced a red message on every launch.
+  if (Platform.OS === "android" && !requireOptionalNativeModule("ExpoTopicSubscriptionModule")) {
+    console.log("[notifications] not supported by this Expo Go build; banners are off, live updates still work");
+    return (cached = null);
+  }
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require("expo-notifications") as NotificationsModule;
@@ -35,7 +46,7 @@ function getNotifications(): NotificationsModule | null {
     // for something that is expected and harmless here.
     console.log(
       "[notifications] unavailable in this app build, continuing without them:",
-      e instanceof Error ? e.message : String(e),
+      e instanceof Error ? e.message : String(e)
     );
     cached = null;
   }
@@ -55,8 +66,7 @@ export async function setUpNotifications(): Promise<void> {
       });
     }
     const current = await Notifications.getPermissionsAsync();
-    if (!current.granted && current.canAskAgain)
-      await Notifications.requestPermissionsAsync();
+    if (!current.granted && current.canAskAgain) await Notifications.requestPermissionsAsync();
   } catch (e) {
     console.warn("Could not set up notifications", e);
   }

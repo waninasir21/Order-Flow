@@ -8,3 +8,5 @@ documents/todos
 .env.local
 *.log
 .DS_Store
+
+coverage

@@ -10,11 +10,16 @@ export function OrderActions({
   status,
   disabled,
   onChange,
+  orderLabel,
 }: {
   status: OrderStatus;
   disabled: boolean;
   onChange: (to: OrderStatus) => void;
+  // e.g. "#A1B2C3". Screen readers list buttons out of context, so "Approve" alone, repeated
+  // on every row, doesn't say which order it acts on.
+  orderLabel?: string;
 }) {
+  const named = (label: string) => (orderLabel ? `${label} order ${orderLabel}` : label);
   const [confirming, setConfirming] = useState(false);
   const actions = ORDER_ACTIONS[status];
 
@@ -27,6 +32,7 @@ export function OrderActions({
         <button
           type="button"
           disabled={disabled}
+          aria-label={named("Yes, reject")}
           onClick={() => {
             setConfirming(false);
             onChange("REJECTED");
@@ -38,6 +44,7 @@ export function OrderActions({
         <button
           type="button"
           onClick={() => setConfirming(false)}
+          aria-label={named("Cancel rejecting")}
           className="rounded-lg border border-line-strong px-3 py-1.5 text-xs font-medium hover:bg-bg"
         >
           Cancel
@@ -53,6 +60,7 @@ export function OrderActions({
           key={a.to}
           type="button"
           disabled={disabled}
+          aria-label={named(a.label)}
           onClick={() => (a.confirm ? setConfirming(true) : onChange(a.to))}
           className={
             a.tone === "primary"

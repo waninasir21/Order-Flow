@@ -101,6 +101,14 @@ subscription to `orderStatusChanged` for the whole app. Details are in
 WebSocket (`apollo/client.ts`), an event is written straight into the cache and deduplicated
 (`realtime/applyOrderUpdate.ts`), and a local notification is shown (`realtime/notifications.ts`).
 
+## Theme, loading, errors and empty states (week 7)
+
+- **Colors:** `src/theme/tokens.ts` holds a light and a dark palette (same values as the web's CSS variables). Components never write a hex value: they call `useTheme()` for colors, or `useThemedStyles(createStyles)` with a stylesheet written as a function of the palette. The app follows the phone's light/dark setting and changes live. The navigation theme is built from the same palette in `app/_layout.tsx`, so headers and the tab bar match.
+- **Loading:** `Loading` (spinner, labelled "Loading") shows only while there is no data at all; refreshes keep the cached list on screen.
+- **Errors:** `ErrorState` (message plus Try again) for a failed query; `CrashScreen` when a screen throws. expo-router's `ErrorBoundary` export covers each route; `AppErrorBoundary` (a class component) covers everything outside a route. Dev builds show the error message on the crash screen; release builds don't.
+- **Empty states:** `EmptyState` for no orders, no outlets, no products, an unknown outlet.
+- **Accessibility:** buttons have roles and labels; the status badge reads "Status: Approved"; the Orders tab announces how many orders are waiting to sync; error text is an alert.
+
 ## Conventions
 
 - Add Expo packages with `npx expo install <package>` so versions match the SDK.
@@ -111,4 +119,4 @@ WebSocket (`apollo/client.ts`), an event is written straight into the cache and 
 
 ## Not built yet
 
-Real-time order updates (week 6), analytics/dark mode (week 7), tests and a store/APK build via EAS (week 8).
+An in-app dark-mode toggle (the app follows the system setting), remote push notifications, tests and a store/APK build via EAS (week 8).

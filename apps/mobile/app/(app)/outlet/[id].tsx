@@ -3,13 +3,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { OrderRow } from "@/components/OrderRow";
 import { PendingOrderCard } from "@/components/PendingOrderCard";
-import { Button, Card, EmptyState, ErrorState, Loading, colors } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorState, Loading } from "@/components/ui";
 import { OUTLETS } from "@/graphql/operations";
 import type { Outlet } from "@/graphql/types";
 import { useOrdersFeed } from "@/hooks/useOrdersFeed";
 import { describeError } from "@/lib/errors";
+import { useThemedStyles } from "@/theme/useTheme";
+import type { Palette } from "@/theme/tokens";
 
 export default function OutletDetailScreen() {
+  const styles = useThemedStyles(createStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
@@ -24,7 +27,11 @@ export default function OutletDetailScreen() {
   }
 
   const outlet = outlets.data?.outlets.find((o) => o.id === id);
-  if (!outlet) return <EmptyState message="This outlet isn't available to you." />;
+  if (!outlet) return <EmptyState
+        title="Outlet not available"
+        message="This outlet isn't assigned to you, or it no longer exists."
+        action={{ label: "Back to outlets", onPress: () => router.replace("/") }}
+      />;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -42,7 +49,7 @@ export default function OutletDetailScreen() {
         <Loading />
       ) : outletOrders.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.muted}>No orders yet.</Text>
+          <Text style={styles.muted}>No orders for this outlet yet. Tap “Place order” to create the first one.</Text>
         </View>
       ) : (
         outletOrders.map((item) =>
@@ -57,11 +64,12 @@ export default function OutletDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: Palette) =>
+  StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, gap: 12 },
   name: { fontSize: 20, fontWeight: "700", color: colors.text, marginBottom: 4 },
   muted: { color: colors.muted, marginTop: 2, fontSize: 14 },
   heading: { fontSize: 16, fontWeight: "700", color: colors.text, marginTop: 8 },
   empty: { paddingVertical: 12 },
-});
+  });
