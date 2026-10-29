@@ -1,0 +1,18 @@
+# Disposable Postgres for the integration tests. Port 5433 so it never collides with a
+# local dev database on 5432; tmpfs so every `down` really is a clean slate.
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: orderflow
+      POSTGRES_PASSWORD: orderflow
+      POSTGRES_DB: orderflow_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderflow -d orderflow_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

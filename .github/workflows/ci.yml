@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch/PR cancels the run that is still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22" # mobile's SQLite test uses node:sqlite, which needs Node >= 22.13
+  HUSKY: "0" # `npm ci` runs the `prepare` script; skip installing git hooks on CI
+
+jobs:
+  lint-typecheck:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # Types for `@prisma/client` come from the generated client; the backend, and the web's
+      # import of the backend state machine, don't typecheck without it.
+      - run: npm run prisma:generate -w @orderflow/backend
+      - run: npx turbo run lint typecheck
+
+  backend-tests:
+    name: Backend tests (unit + integration)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: orderflow
+          POSTGRES_PASSWORD: orderflow
+          POSTGRES_DB: orderflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orderflow -d orderflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orderflow:orderflow@localhost:5432/orderflow_test
+      JWT_SECRET: ci-only-secret-not-used-anywhere-else
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate -w @orderflow/backend
+      # Build the schema the way production does: by replaying the committed migrations.
+      - run: npx prisma migrate deploy
+        working-directory: apps/backend
+      # Fails if schema.prisma was changed without a migration (the tests would pass on a
+      # database that production will never have).
+      - name: Check migrations match schema.prisma
+        run: >
+          npx prisma migrate diff
+          --from-url "$DATABASE_URL"
+          --to-schema-datamodel prisma/schema.prisma
+          --exit-code
+        working-directory: apps/backend
+      - run: npm run test:unit -w @orderflow/backend
+      - run: npm run test:integration -w @orderflow/backend
+
+  frontend-tests:
+    name: Mobile and web tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate -w @orderflow/backend
+      - run: npm test -w @orderflow/mobile
+      - run: npm test -w @orderflow/web

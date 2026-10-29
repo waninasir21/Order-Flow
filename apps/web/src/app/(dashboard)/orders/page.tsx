@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { PageHeader } from "@/components/page-header";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { getAdmin } from "@/lib/dal";
@@ -14,7 +15,8 @@ export const metadata: Metadata = { title: "Orders" };
 export default function OrdersPage() {
   return (
     <>
-      <PageHeader title="Orders" description="Every order placed from the field app, newest first." />
+      <PageHeader title="Orders" description="Every order placed from the field app, newest first. Updates every few seconds." />
+      <AutoRefresh />
       <Suspense fallback={<TableSkeleton />}>
         <OrdersData />
       </Suspense>
