@@ -45,7 +45,7 @@ async function AnalyticsData({ searchParams }: { searchParams: PageProps<"/analy
 
   return (
     <div className="space-y-6">
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Summary">
+      <ul className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4" aria-label="Summary">
         <StatCard label="Orders this week" value={s.ordersThisWeek} hint="Last 7 days" />
         <StatCard
           label="Pending approvals"
@@ -142,11 +142,11 @@ function StatCard({
   const body = (
     <>
       <span className="block text-xs text-muted">{label}</span>
-      <span className={`num mt-1 block text-3xl font-semibold ${color}`}>{value}</span>
+      <span className={`num mt-1 block text-2xl font-semibold sm:text-3xl ${color}`}>{value}</span>
       <span className="mt-1 block text-xs text-muted">{hint}</span>
     </>
   );
-  const box = "block rounded-xl border border-line bg-surface px-4 py-3";
+  const box = "block rounded-xl border border-line bg-surface px-3 py-3 sm:px-4";
   return (
     <li>
       {href ? (

@@ -135,6 +135,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Push page content above the fixed mobile tab bar on notched devices
+   (iPhone home indicator, Android gesture bar). */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Money and counts line up in columns. */
 .num {
   font-variant-numeric: tabular-nums;

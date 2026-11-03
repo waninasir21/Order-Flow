@@ -3,28 +3,50 @@ import { AnalyticsIcon, InventoryIcon, OrdersIcon } from "./icons";
 import { SidebarNavActive } from "./sidebar-nav-active";
 
 const ITEMS = [
-  { href: "/orders", label: "Orders", Icon: OrdersIcon },
+  { href: "/orders",    label: "Orders",    Icon: OrdersIcon },
   { href: "/inventory", label: "Inventory", Icon: InventoryIcon },
   { href: "/analytics", label: "Analytics", Icon: AnalyticsIcon },
 ];
 
-// The links themselves are static markup. Which one is highlighted depends on the URL, which is
-// only known per request, so that part (SidebarNavActive) is a client component that streams in;
-// until then the same links render with nothing highlighted.
-export function NavLinks({ pathname }: { pathname: string | null }) {
+// Shared link renderer used by both the desktop sidebar and the mobile bottom tab bar.
+// `mobile` switches the layout from a vertical list to a horizontal row of icon+label tabs.
+export function NavLinks({ pathname, mobile = false }: { pathname: string | null; mobile?: boolean }) {
+  if (mobile) {
+    return (
+      <>
+        {ITEMS.map(({ href, label, Icon }) => {
+          const active = pathname !== null && (pathname === href || pathname.startsWith(`${href}/`));
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors ${
+                active ? "text-accent" : "text-side-muted"
+              }`}
+            >
+              <Icon className={active ? "text-accent" : ""} />
+              {label}
+            </Link>
+          );
+        })}
+      </>
+    );
+  }
+
   return (
-    // On a phone the logo sits on one row and the links on the next (three links no longer fit beside
-    // the logo); the padding keeps focus rings from being clipped by the scroll container.
-    <nav aria-label="Main" className="-mx-1 flex w-full gap-1 overflow-x-auto px-1 py-1 md:mx-0 md:w-auto md:flex-col md:overflow-visible md:p-0">
+    <nav
+      aria-label="Main"
+      className="flex flex-col gap-1"
+    >
       {ITEMS.map(({ href, label, Icon }) => {
-        // /orders/abc123 still highlights "Orders".
         const active = pathname !== null && (pathname === href || pathname.startsWith(`${href}/`));
         return (
           <Link
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               active
                 ? "bg-side-active text-side-ink"
                 : "text-side-muted hover:bg-side-active/60 hover:text-side-ink"
@@ -39,6 +61,11 @@ export function NavLinks({ pathname }: { pathname: string | null }) {
   );
 }
 
-export function SidebarNav() {
-  return <SidebarNavActive fallback={<NavLinks pathname={null} />} />;
+export function SidebarNav({ mobile = false }: { mobile?: boolean }) {
+  return (
+    <SidebarNavActive
+      mobile={mobile}
+      fallback={<NavLinks pathname={null} mobile={mobile} />}
+    />
+  );
 }

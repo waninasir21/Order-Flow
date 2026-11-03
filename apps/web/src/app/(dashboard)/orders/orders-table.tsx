@@ -11,15 +11,13 @@ import { STATUSES, STATUS_LABEL, formatDateTime, formatMoney, shortId } from "@/
 import type { OrderStatus } from "@/lib/queries";
 import { useOrderStatusChange } from "./use-order-status";
 
-// The page maps the GraphQL result to this small shape, so the browser only receives what the
-// table shows (no line items).
 export interface OrderRowData {
   id: string;
   status: OrderStatus;
   createdAt: string;
   total: number;
-  units: number; // total quantity across line items
-  lines: number; // number of different products
+  units: number;
+  lines: number;
   outletName: string;
   repName: string;
 }
@@ -53,8 +51,6 @@ function readFilters(params: URLSearchParams): Filters {
   };
 }
 
-// Filters live in the URL so Back from an order's detail page returns to the same view and a
-// filtered list can be shared. Only non-default values are written.
 function writeFilters(f: Filters) {
   const params = new URLSearchParams(window.location.search);
   const set = (key: string, value: string, isDefault: boolean) =>
@@ -65,21 +61,16 @@ function writeFilters(f: Filters) {
   set("dir", f.dir, f.dir === (f.sort === "outlet" ? "asc" : "desc"));
   set("page", String(f.page), f.page === 1);
   const qs = params.toString();
-  // The native History API is integrated with Next's router: it updates useSearchParams()
-  // without asking the server to render the page again.
   window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
 }
 
 export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }) {
-  // `orders` is the server's data with any in-flight approve / reject layered on top.
   const { items: orders, pending, error, dismissError, change } = useOrderStatusChange(serverOrders);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState<Filters>(() => readFilters(new URLSearchParams(searchParams.toString())));
 
   const update = (patch: Partial<Filters>) => {
-    // Apply the patch, reset to page 1, and sync the URL immediately — no need for a
-    // post-render effect; the URL should reflect the new state in the same event loop tick.
     setFilters((current) => {
       const next = { ...current, page: 1, ...patch };
       writeFilters(next);
@@ -107,7 +98,7 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
     rows.sort((a, b) => {
       if (filters.sort === "outlet") return sign * a.outletName.localeCompare(b.outletName);
       if (filters.sort === "total") return sign * (a.total - b.total);
-      return sign * a.createdAt.localeCompare(b.createdAt); // ISO strings sort chronologically
+      return sign * a.createdAt.localeCompare(b.createdAt);
     });
     return rows;
   }, [orders, filters]);
@@ -127,8 +118,14 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
 
   return (
     <section aria-label="Orders">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1.5">
+      {/* ── Filters bar ──────────────────────────────────────────────── */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        {/* Status pills — scroll horizontally if they don't fit */}
+        <div
+          role="group"
+          aria-label="Filter by status"
+          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+        >
           {(["ALL", ...STATUSES] as StatusFilter[]).map((s) => {
             const active = filters.status === s;
             return (
@@ -137,7 +134,7 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
                 type="button"
                 aria-pressed={active}
                 onClick={() => update({ status: s })}
-                className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                className={`shrink-0 rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
                   active
                     ? "border-accent bg-accent text-accent-ink"
                     : "border-line-strong bg-surface text-muted hover:text-ink"
@@ -175,7 +172,49 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
         </p>
       ) : null}
 
-      <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
+      {/* ── Mobile card list (hidden on md+) ─────────────────────────── */}
+      <div className="md:hidden">
+        {pageRows.length === 0 ? (
+          <EmptyOrders orders={orders} onClear={() => setFilters(DEFAULTS)} />
+        ) : (
+          <ul className="space-y-2">
+            {pageRows.map((o) => (
+              <li key={o.id}>
+                <Link
+                  href={`/orders/${o.id}`}
+                  className="block rounded-xl border border-line bg-surface p-4 transition-colors active:bg-bg"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{o.outletName}</p>
+                      <p className="mt-0.5 text-xs text-muted truncate">{o.repName}</p>
+                    </div>
+                    <StatusBadge status={o.status} />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-4 text-sm">
+                    <span className="num text-muted">{formatDateTime(o.createdAt)}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted">{o.units} unit{o.units === 1 ? "" : "s"}</span>
+                      <span className="num font-semibold">{formatMoney(o.total)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 border-t border-line pt-3" onClick={(e) => e.preventDefault()}>
+                    <OrderActions
+                      status={o.status}
+                      disabled={pending}
+                      onChange={(to) => change(o.id, to)}
+                      orderLabel={shortId(o.id)}
+                    />
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* ── Desktop table (hidden below md) ──────────────────────────── */}
+      <div className="relative hidden overflow-x-auto rounded-xl border border-line bg-surface md:block">
         <table className="w-full min-w-[980px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-muted">
@@ -225,41 +264,44 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
             ))}
           </tbody>
         </table>
-
-        {visible.length === 0 ? (
-          orders.length === 0 ? (
-            <EmptyState
-              title="No orders yet"
-              description="Orders placed from the field app will appear here, newest first, ready for you to approve or reject."
-            />
-          ) : (
-            <EmptyState
-              icon={<SearchIcon />}
-              title="No orders match these filters"
-              description="Try a different status or a shorter search."
-              action={{ label: "Clear filters", onClick: () => setFilters(DEFAULTS) }}
-            />
-          )
-        ) : null}
+        {pageRows.length === 0 ? <EmptyOrders orders={orders} onClear={() => setFilters(DEFAULTS)} /> : null}
       </div>
 
+      {/* ── Pagination ───────────────────────────────────────────────── */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
         <p className="num" aria-live="polite">
           {visible.length === 0 ? "0 orders" : `Showing ${from}–${to} of ${visible.length}`}
         </p>
         <div className="flex items-center gap-2">
           <PagerButton disabled={page <= 1} onClick={() => setFilters((f) => ({ ...f, page: page - 1 }))}>
-            Previous
+            ← Previous
           </PagerButton>
           <span className="num px-1">
-            Page {page} of {pageCount}
+            {page} / {pageCount}
           </span>
           <PagerButton disabled={page >= pageCount} onClick={() => setFilters((f) => ({ ...f, page: page + 1 }))}>
-            Next
+            Next →
           </PagerButton>
         </div>
       </div>
     </section>
+  );
+}
+
+// Shared empty state used by both the card list and the table.
+function EmptyOrders({ orders, onClear }: { orders: OrderRowData[]; onClear: () => void }) {
+  return orders.length === 0 ? (
+    <EmptyState
+      title="No orders yet"
+      description="Orders placed from the field app will appear here, newest first, ready for you to approve or reject."
+    />
+  ) : (
+    <EmptyState
+      icon={<SearchIcon />}
+      title="No orders match these filters"
+      description="Try a different status or a shorter search."
+      action={{ label: "Clear filters", onClick: onClear }}
+    />
   );
 }
 

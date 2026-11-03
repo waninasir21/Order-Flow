@@ -27,15 +27,17 @@ export async function UserMenu() {
     : "";
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
+      {/* Avatar + name — name hidden on mobile to save space */}
       {admin ? (
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <span
             aria-hidden
-            className="grid size-8 place-items-center rounded-full bg-accent-soft text-xs font-bold text-accent"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-bold text-accent"
           >
             {initials}
           </span>
+          {/* Name only shows from sm up */}
           <div className="hidden leading-tight sm:block">
             <p className="text-sm font-semibold">{admin.name}</p>
             <p className="text-xs text-muted">Administrator</p>
@@ -45,9 +47,12 @@ export async function UserMenu() {
       <form action={logoutAction}>
         <button
           type="submit"
-          className="rounded-lg border border-line-strong px-3 py-1.5 text-sm font-medium transition-colors hover:bg-bg"
+          aria-label="Sign out"
+          className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm font-medium transition-colors hover:bg-bg"
         >
-          Sign out
+          {/* Full label on sm+, icon only on mobile */}
+          <span className="hidden sm:inline">Sign out</span>
+          <span className="sm:hidden" aria-hidden>➜]</span>
         </button>
       </form>
     </div>
@@ -56,10 +61,10 @@ export async function UserMenu() {
 
 export function UserMenuSkeleton() {
   return (
-    <div className="flex items-center gap-3" aria-hidden>
+    <div className="flex items-center gap-2" aria-hidden>
       <span className="skeleton size-8 !rounded-full" />
       <span className="skeleton hidden h-8 w-28 sm:block" />
-      <span className="skeleton h-8 w-20" />
+      <span className="skeleton h-8 w-16 sm:w-20" />
     </div>
   );
 }
