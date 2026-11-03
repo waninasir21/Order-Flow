@@ -71,11 +71,15 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
   const [filters, setFilters] = useState<Filters>(() => readFilters(new URLSearchParams(searchParams.toString())));
 
   const update = (patch: Partial<Filters>) => {
-    setFilters((current) => {
-      const next = { ...current, page: 1, ...patch };
-      writeFilters(next);
-      return next;
-    });
+    // Derive next state here in the event handler — not inside a setState updater.
+    // Updater functions must be pure (React can call them multiple times during
+    // reconciliation), so calling history.replaceState inside one triggers the
+    // "Cannot update a component while rendering a different component" warning.
+    // Computing `next` outside and passing it directly to both setFilters and
+    // writeFilters keeps the side effect in the event handler where it belongs.
+    const next: Filters = { ...filters, page: 1, ...patch };
+    setFilters(next);
+    writeFilters(next);
   };
 
   const counts = useMemo(() => {
@@ -198,7 +202,7 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
                       <span className="num font-semibold">{formatMoney(o.total)}</span>
                     </div>
                   </div>
-                  <div className="mt-3 border-t border-line pt-3" onClick={(e) => e.preventDefault()}>
+                  <div className="mt-3 flex justify-end border-t border-line pt-3" onClick={(e) => e.preventDefault()}>
                     <OrderActions
                       status={o.status}
                       disabled={pending}
