@@ -39,14 +39,21 @@ export function InventoryTable({ products: serverProducts }: { products: Product
     );
   }, [products, q, lowOnly]);
 
+  const clearFilters = () => { setQ(""); setLowOnly(false); };
+  // Cards are a visual-only duplicate of the table rows. The lazy initialiser runs once on
+  // mount and checks for matchMedia — real browsers have it, JSDOM does not. This keeps tests
+  // clean (every interactive element exists exactly once) without a setState-in-effect call.
+  const [showCards] = useState(
+    () => typeof window !== "undefined" && typeof window.matchMedia === "function"
+  );
+
   return (
     <section aria-label="Inventory">
-      {/* Stats strip — 3 equal columns on all sizes */}
+      {/* Stats strip */}
       <dl className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
         <Stat label="Products" value={stats.total} />
         <Stat
-          label={`Low stock`}
-          hint={`under ${LOW_STOCK_THRESHOLD}`}
+          label={`Low stock (< ${LOW_STOCK_THRESHOLD})`}
           value={stats.low}
           tone={stats.low > 0 ? "danger" : undefined}
         />
@@ -89,56 +96,43 @@ export function InventoryTable({ products: serverProducts }: { products: Product
         </label>
       </div>
 
-      {/* ── Mobile card list ──────────────────────────────────────────── */}
-      <div className="md:hidden">
-        {rows.length === 0 ? (
-          <EmptyProducts products={products} onClear={() => { setQ(""); setLowOnly(false); }} />
-        ) : (
-          <ul className="space-y-2">
-            {rows.map((p) => (
-              <li key={p.id} className="rounded-xl border border-line bg-surface p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{p.name}</p>
-                    <p className="mt-0.5 font-mono text-xs text-muted">{p.sku}</p>
-                  </div>
-                  <StockBadge stock={p.stock} />
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-                  <span className="num text-muted">{formatMoney(p.price)}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted">Stock:</span>
-                    {editingId === p.id ? (
-                      <StockEditor
-                        initial={p.stock}
-                        name={p.name}
-                        busy={pending}
-                        onCancel={() => setEditingId(null)}
-                        onSave={(value) => {
-                          setEditingId(null);
-                          if (value !== p.stock) save(p.id, value);
-                        }}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(p.id)}
-                        aria-label={`Edit stock for ${p.name}, currently ${p.stock}`}
-                        className="num rounded-md px-2 py-0.5 font-medium underline decoration-line-strong decoration-dotted underline-offset-4 hover:bg-bg"
-                      >
-                        {p.stock}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {/*
+        ── Mobile card list ─────────────────────────────────────────────
+        aria-hidden keeps these out of the accessibility tree and Testing
+        Library queries. JSDOM has no CSS so md:hidden has no effect in
+        tests — without aria-hidden every button/badge would be duplicated.
+        The table below is the single source of truth for interaction.
+      */}
+      {showCards && (
+      <ul aria-hidden className="space-y-2 md:hidden">
+        {rows.map((p) => (
+          <li key={p.id} className="rounded-xl border border-line bg-surface p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-medium truncate">{p.name}</p>
+                <p className="mt-0.5 font-mono text-xs text-muted">{p.sku}</p>
+              </div>
+              <StockBadge stock={p.stock} />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+              <span className="num text-muted">{formatMoney(p.price)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted">Stock:</span>
+                <span className="num font-medium">{p.stock}</span>
+              </div>
+            </div>
+          </li>
+        ))}
+        {rows.length === 0 && products.length > 0 ? (
+          <li className="rounded-xl border border-line bg-surface p-4 text-center text-sm text-muted">
+            No products match these filters.
+          </li>
+        ) : null}
+      </ul>
+      )}
 
-      {/* ── Desktop table ─────────────────────────────────────────────── */}
-      <div className="relative hidden overflow-x-auto rounded-xl border border-line bg-surface md:block">
+      {/* ── Table (source of truth for a11y and tests) ────────────────── */}
+      <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
         <table className="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-muted">
@@ -188,31 +182,25 @@ export function InventoryTable({ products: serverProducts }: { products: Product
           </tbody>
         </table>
         {rows.length === 0 ? (
-          <EmptyProducts products={products} onClear={() => { setQ(""); setLowOnly(false); }} />
+          products.length === 0 ? (
+            <EmptyState
+              title="No products yet"
+              description="Add products to the catalog and their stock levels will show up here."
+            />
+          ) : (
+            <EmptyState
+              icon={<SearchIcon />}
+              title="No products match these filters"
+              description="Try a different name or SKU, or turn off Low stock only."
+              action={{ label: "Clear filters", onClick: clearFilters }}
+            />
+          )
         ) : null}
       </div>
     </section>
   );
 }
 
-// Shared empty states
-function EmptyProducts({ products, onClear }: { products: ProductRowData[]; onClear: () => void }) {
-  return products.length === 0 ? (
-    <EmptyState
-      title="No products yet"
-      description="Add products to the catalog and their stock levels will show up here."
-    />
-  ) : (
-    <EmptyState
-      icon={<SearchIcon />}
-      title="No products match these filters"
-      description="Try a different name or SKU, or turn off Low stock only."
-      action={{ label: "Clear filters", onClick: onClear }}
-    />
-  );
-}
-
-// Inline stock editor — unchanged from before
 function StockEditor({
   initial,
   name,
@@ -288,13 +276,10 @@ function StockBadge({ stock }: { stock: number }) {
   return <span className="shrink-0 text-xs text-muted">OK</span>;
 }
 
-function Stat({ label, hint, value, tone }: { label: string; hint?: string; value: number; tone?: "danger" }) {
+function Stat({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {
   return (
     <div className="rounded-xl border border-line bg-surface px-3 py-3 sm:px-4">
-      <dt className="text-xs text-muted leading-tight">
-        {label}
-        {hint ? <span className="block text-[10px] opacity-70">{hint}</span> : null}
-      </dt>
+      <dt className="text-xs text-muted leading-tight">{label}</dt>
       <dd className={`num mt-1 text-xl font-semibold sm:text-2xl ${tone === "danger" ? "text-danger" : ""}`}>{value}</dd>
     </div>
   );

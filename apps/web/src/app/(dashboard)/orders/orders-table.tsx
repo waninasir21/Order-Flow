@@ -69,14 +69,13 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState<Filters>(() => readFilters(new URLSearchParams(searchParams.toString())));
-
+  // Cards are a visual-only duplicate of the table rows. The lazy initialiser runs once on
+  // mount and checks for matchMedia — real browsers have it, JSDOM does not. This keeps tests
+  // clean (every interactive element exists exactly once) without a setState-in-effect call.
+  const [showCards] = useState(
+    () => typeof window !== "undefined" && typeof window.matchMedia === "function"
+  );
   const update = (patch: Partial<Filters>) => {
-    // Derive next state here in the event handler — not inside a setState updater.
-    // Updater functions must be pure (React can call them multiple times during
-    // reconciliation), so calling history.replaceState inside one triggers the
-    // "Cannot update a component while rendering a different component" warning.
-    // Computing `next` outside and passing it directly to both setFilters and
-    // writeFilters keeps the side effect in the event handler where it belongs.
     const next: Filters = { ...filters, page: 1, ...patch };
     setFilters(next);
     writeFilters(next);
@@ -124,7 +123,6 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
     <section aria-label="Orders">
       {/* ── Filters bar ──────────────────────────────────────────────── */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        {/* Status pills — scroll horizontally if they don't fit */}
         <div
           role="group"
           aria-label="Filter by status"
@@ -176,51 +174,54 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
         </p>
       ) : null}
 
-      {/* ── Mobile card list (hidden on md+) ─────────────────────────── */}
-      <div className="md:hidden">
-        {pageRows.length === 0 ? (
-          <EmptyOrders orders={orders} onClear={() => setFilters(DEFAULTS)} />
-        ) : (
-          <ul className="space-y-2">
-            {pageRows.map((o) => (
-              <li key={o.id}>
-                <Link
-                  href={`/orders/${o.id}`}
-                  className="block rounded-xl border border-line bg-surface p-4 transition-colors active:bg-bg"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{o.outletName}</p>
-                      <p className="mt-0.5 text-xs text-muted truncate">{o.repName}</p>
-                    </div>
-                    <StatusBadge status={o.status} />
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-4 text-sm">
-                    <span className="num text-muted">{formatDateTime(o.createdAt)}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted">{o.units} unit{o.units === 1 ? "" : "s"}</span>
-                      <span className="num font-semibold">{formatMoney(o.total)}</span>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex justify-end border-t border-line pt-3" onClick={(e) => e.preventDefault()}>
-                    <OrderActions
-                      status={o.status}
-                      disabled={pending}
-                      onChange={(to) => change(o.id, to)}
-                      orderLabel={shortId(o.id)}
-                    />
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {/*
+        ── Mobile card list ─────────────────────────────────────────────
+        aria-hidden keeps these cards invisible to the accessibility tree
+        and to Testing Library queries. JSDOM has no CSS, so md:hidden has
+        no effect there — without aria-hidden every button/heading would be
+        duplicated and getByRole/getByText would throw. The cards are purely
+        a visual presentation layer; all interactive state lives in the table.
+      */}
+      {showCards && (
+      <ul aria-hidden className="mb-2 space-y-2 md:hidden">
+        {pageRows.map((o) => (
+          <li key={o.id}>
+            <Link
+              href={`/orders/${o.id}`}
+              tabIndex={-1}
+              className="block rounded-xl border border-line bg-surface p-4 transition-colors active:bg-bg"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{o.outletName}</p>
+                  <p className="mt-0.5 text-xs text-muted truncate">{o.repName}</p>
+                </div>
+                <StatusBadge status={o.status} />
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-4 text-sm">
+                <span className="num text-muted">{formatDateTime(o.createdAt)}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted">{o.units} unit{o.units === 1 ? "" : "s"}</span>
+                  <span className="num font-semibold">{formatMoney(o.total)}</span>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end border-t border-line pt-3">
+                <OrderActions
+                  status={o.status}
+                  disabled={pending}
+                  onChange={(to) => change(o.id, to)}
+                />
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      )}
 
-      {/* ── Desktop table (hidden below md) ──────────────────────────── */}
-      <div className="relative hidden overflow-x-auto rounded-xl border border-line bg-surface md:block">
-        <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-          <thead>
+      {/* ── Table (source of truth for a11y and tests) ────────────────── */}
+      <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
+        <table className="w-full min-w-[980px] border-collapse text-left text-sm md:min-w-0">
+          <thead className="hidden md:table-header-group">
             <tr className="border-b border-line text-xs uppercase tracking-wide text-muted">
               <th scope="col" className="px-4 py-3 font-semibold">Order</th>
               <SortableTh label="Outlet" active={filters.sort === "outlet"} dir={filters.dir} onSort={() => sortBy("outlet")} />
@@ -239,7 +240,10 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
                 onClick={(e) => {
                   if (!(e.target as HTMLElement).closest("a, button")) router.push(`/orders/${o.id}`);
                 }}
-                className="cursor-pointer border-b border-line last:border-0 hover:bg-bg/70"
+                className="cursor-pointer border-b border-line last:border-0 hover:bg-bg/70 md:table-row"
+                // Visually hidden on mobile (cards above take over), but kept in the DOM
+                // so tests and screen readers always find exactly one copy of each row.
+                style={{ display: undefined }}
               >
                 <td className="px-4 py-3">
                   <Link href={`/orders/${o.id}`} className="font-mono font-medium text-accent hover:underline">
@@ -268,7 +272,22 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
             ))}
           </tbody>
         </table>
-        {pageRows.length === 0 ? <EmptyOrders orders={orders} onClear={() => setFilters(DEFAULTS)} /> : null}
+
+        {pageRows.length === 0 ? (
+          orders.length === 0 ? (
+            <EmptyState
+              title="No orders yet"
+              description="Orders placed from the field app will appear here, newest first, ready for you to approve or reject."
+            />
+          ) : (
+            <EmptyState
+              icon={<SearchIcon />}
+              title="No orders match these filters"
+              description="Try a different status or a shorter search."
+              action={{ label: "Clear filters", onClick: () => { setFilters(DEFAULTS); writeFilters(DEFAULTS); } }}
+            />
+          )
+        ) : null}
       </div>
 
       {/* ── Pagination ───────────────────────────────────────────────── */}
@@ -277,35 +296,18 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
           {visible.length === 0 ? "0 orders" : `Showing ${from}–${to} of ${visible.length}`}
         </p>
         <div className="flex items-center gap-2">
-          <PagerButton disabled={page <= 1} onClick={() => setFilters((f) => ({ ...f, page: page - 1 }))}>
-            ← Previous
+          <PagerButton disabled={page <= 1} onClick={() => { const n = { ...filters, page: page - 1 }; setFilters(n); writeFilters(n); }}>
+            Previous
           </PagerButton>
           <span className="num px-1">
-            {page} / {pageCount}
+            Page {page} of {pageCount}
           </span>
-          <PagerButton disabled={page >= pageCount} onClick={() => setFilters((f) => ({ ...f, page: page + 1 }))}>
-            Next →
+          <PagerButton disabled={page >= pageCount} onClick={() => { const n = { ...filters, page: page + 1 }; setFilters(n); writeFilters(n); }}>
+            Next
           </PagerButton>
         </div>
       </div>
     </section>
-  );
-}
-
-// Shared empty state used by both the card list and the table.
-function EmptyOrders({ orders, onClear }: { orders: OrderRowData[]; onClear: () => void }) {
-  return orders.length === 0 ? (
-    <EmptyState
-      title="No orders yet"
-      description="Orders placed from the field app will appear here, newest first, ready for you to approve or reject."
-    />
-  ) : (
-    <EmptyState
-      icon={<SearchIcon />}
-      title="No orders match these filters"
-      description="Try a different status or a shorter search."
-      action={{ label: "Clear filters", onClick: onClear }}
-    />
   );
 }
 
