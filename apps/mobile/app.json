@@ -23,6 +23,17 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "2cf84bbd-ce6d-458d-a31e-882801ec05d2"
+      }
+    },
+    "owner": "orderflow2"
   }
 }

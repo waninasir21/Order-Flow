@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { SearchIcon } from "@/components/icons";
 import { EmptyState } from "@/components/empty-state";
 import { OrderActions } from "@/components/order-actions";
@@ -77,10 +77,15 @@ export function OrdersTable({ orders: serverOrders }: { orders: OrderRowData[] }
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState<Filters>(() => readFilters(new URLSearchParams(searchParams.toString())));
 
-  useEffect(() => writeFilters(filters), [filters]);
-
-  const update = (patch: Partial<Filters>) =>
-    setFilters((current) => ({ ...current, page: 1, ...patch })); // any change returns to page 1
+  const update = (patch: Partial<Filters>) => {
+    // Apply the patch, reset to page 1, and sync the URL immediately — no need for a
+    // post-render effect; the URL should reflect the new state in the same event loop tick.
+    setFilters((current) => {
+      const next = { ...current, page: 1, ...patch };
+      writeFilters(next);
+      return next;
+    });
+  };
 
   const counts = useMemo(() => {
     const result: Record<StatusFilter, number> = { ALL: orders.length, PLACED: 0, APPROVED: 0, FULFILLED: 0, REJECTED: 0 };

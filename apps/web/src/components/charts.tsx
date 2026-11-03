@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+
 import {
   Bar,
   BarChart,
@@ -15,26 +15,19 @@ import {
 import { formatDay } from "@/lib/format";
 import { useResolvedTheme } from "@/lib/theme";
 
-// Recharts writes colors into SVG attributes, where `var(--accent)` is not reliable, so the
-// charts read the real values of the CSS tokens and re-read them whenever the theme changes.
-// That keeps the charts on the same palette as the rest of the page, in both modes.
+// Recharts writes colors into SVG attributes, so CSS variables like `var(--accent)` don't work
+// there. Rather than reading the live computed style (which forces a style recalculation on every
+// theme change), we keep a static palette map that mirrors globals.css exactly. When the theme
+// changes, `useResolvedTheme()` returns the new value and the map lookup picks the right palette
+// instantly — no DOM read, no forced reflow.
+const PALETTES = {
+  light: { accent: "#1d6b57", ink: "#17201c", muted: "#66706a", line: "#e3dfd3", surface: "#fffdf9" },
+  dark:  { accent: "#4fb99b", ink: "#e8eee9", muted: "#93a097", line: "#25302a", surface: "#161d1a" },
+} as const;
+
 function useChartColors() {
   const theme = useResolvedTheme();
-  return useMemo(() => {
-    const light = { accent: "#1d6b57", ink: "#17201c", muted: "#66706a", line: "#e3dfd3", surface: "#fffdf9" };
-    if (typeof document === "undefined") return light;
-    const css = getComputedStyle(document.documentElement);
-    const read = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
-    return {
-      accent: read("--accent", light.accent),
-      ink: read("--ink", light.ink),
-      muted: read("--muted", light.muted),
-      line: read("--line", light.line),
-      surface: read("--surface", light.surface),
-    };
-    // `theme` isn't read inside, but a change of it is exactly when the tokens change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme]);
+  return PALETTES[theme];
 }
 
 // Same data as a table for people who can't see the chart (screen readers, and anyone who
