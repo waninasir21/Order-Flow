@@ -16,7 +16,6 @@ export default function OrdersPage() {
   return (
     <>
       <PageHeader title="Orders" description="Every order placed from the field app, newest first. Updates every few seconds." />
-      <AutoRefresh />
       <Suspense fallback={<TableSkeleton />}>
         <OrdersData />
       </Suspense>
@@ -40,5 +39,12 @@ async function OrdersData() {
     repName: o.employee.name,
   }));
 
-  return <OrdersTable orders={rows} />;
+  // Only poll when there is something to watch. If there are no orders yet, there is nothing
+  // to refresh — save the server round-trip until the user gets their first real order.
+  return (
+    <>
+      <AutoRefresh enabled={rows.length > 0} />
+      <OrdersTable orders={rows} />
+    </>
+  );
 }

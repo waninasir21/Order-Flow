@@ -61,10 +61,32 @@ async function OrderDetail({ params }: { params: PageProps<"/orders/[id]">["para
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section aria-labelledby="items-heading" className="overflow-hidden rounded-xl border border-line bg-surface">
-          <h2 id="items-heading" className="border-b border-line px-5 py-3.5 text-sm font-semibold">
+          <h2 id="items-heading" className="border-b border-line px-4 py-3.5 text-sm font-semibold sm:px-5">
             Items <span className="num font-normal text-muted">· {units} unit{units === 1 ? "" : "s"}</span>
           </h2>
-          <div className="overflow-x-auto">
+
+          {/* Mobile item cards — shown below sm */}
+          <ul className="divide-y divide-line sm:hidden">
+            {order.items.map((item) => (
+              <li key={item.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-medium leading-snug">{item.product.name}</p>
+                  <p className="mt-0.5 font-mono text-xs text-muted">{item.product.sku}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    {item.quantity} × {formatMoney(item.priceAtOrder)}
+                  </p>
+                </div>
+                <p className="num shrink-0 font-semibold">{formatMoney(lineTotal(item.priceAtOrder, item.quantity))}</p>
+              </li>
+            ))}
+            <li className="flex items-center justify-between border-t border-line-strong px-4 py-3.5">
+              <span className="text-sm font-semibold">Order total</span>
+              <span className="num text-base font-semibold">{formatMoney(order.total)}</span>
+            </li>
+          </ul>
+
+          {/* Desktop table — shown from sm up */}
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[480px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-line text-xs uppercase tracking-wide text-muted">
@@ -130,7 +152,7 @@ async function OrderDetail({ params }: { params: PageProps<"/orders/[id]">["para
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-line bg-surface p-5 text-sm">
+    <section className="rounded-xl border border-line bg-surface p-4 text-sm sm:p-5">
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{title}</h2>
       {children}
     </section>

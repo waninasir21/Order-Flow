@@ -39,11 +39,24 @@ export function InventoryTable({ products: serverProducts }: { products: Product
     );
   }, [products, q, lowOnly]);
 
+  const clearFilters = () => { setQ(""); setLowOnly(false); };
+  // Cards are a visual-only duplicate of the table rows. The lazy initialiser runs once on
+  // mount and checks for matchMedia — real browsers have it, JSDOM does not. This keeps tests
+  // clean (every interactive element exists exactly once) without a setState-in-effect call.
+  const [showCards] = useState(
+    () => typeof window !== "undefined" && typeof window.matchMedia === "function"
+  );
+
   return (
     <section aria-label="Inventory">
-      <dl className="mb-6 grid grid-cols-3 gap-3">
+      {/* Stats strip */}
+      <dl className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
         <Stat label="Products" value={stats.total} />
-        <Stat label={`Low stock (under ${LOW_STOCK_THRESHOLD})`} value={stats.low} tone={stats.low > 0 ? "danger" : undefined} />
+        <Stat
+          label={`Low stock (< ${LOW_STOCK_THRESHOLD})`}
+          value={stats.low}
+          tone={stats.low > 0 ? "danger" : undefined}
+        />
         <Stat label="Out of stock" value={stats.out} tone={stats.out > 0 ? "danger" : undefined} />
       </dl>
 
@@ -59,7 +72,8 @@ export function InventoryTable({ products: serverProducts }: { products: Product
         </p>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      {/* Filters */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
           <input
             type="checkbox"
@@ -82,8 +96,42 @@ export function InventoryTable({ products: serverProducts }: { products: Product
         </label>
       </div>
 
-      {/* `relative` matters: the table's sr-only header is absolutely positioned. Without a positioned
-          scroll container it escapes the container's clipping and widens the whole page on phones. */}
+      {/*
+        ── Mobile card list ─────────────────────────────────────────────
+        aria-hidden keeps these out of the accessibility tree and Testing
+        Library queries. JSDOM has no CSS so md:hidden has no effect in
+        tests — without aria-hidden every button/badge would be duplicated.
+        The table below is the single source of truth for interaction.
+      */}
+      {showCards && (
+      <ul aria-hidden className="space-y-2 md:hidden">
+        {rows.map((p) => (
+          <li key={p.id} className="rounded-xl border border-line bg-surface p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-medium truncate">{p.name}</p>
+                <p className="mt-0.5 font-mono text-xs text-muted">{p.sku}</p>
+              </div>
+              <StockBadge stock={p.stock} />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+              <span className="num text-muted">{formatMoney(p.price)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted">Stock:</span>
+                <span className="num font-medium">{p.stock}</span>
+              </div>
+            </div>
+          </li>
+        ))}
+        {rows.length === 0 && products.length > 0 ? (
+          <li className="rounded-xl border border-line bg-surface p-4 text-center text-sm text-muted">
+            No products match these filters.
+          </li>
+        ) : null}
+      </ul>
+      )}
+
+      {/* ── Table (source of truth for a11y and tests) ────────────────── */}
       <div className="relative overflow-x-auto rounded-xl border border-line bg-surface">
         <table className="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead>
@@ -137,20 +185,14 @@ export function InventoryTable({ products: serverProducts }: { products: Product
           products.length === 0 ? (
             <EmptyState
               title="No products yet"
-              description="Add products to the catalog (the seed script does this for the demo data) and their stock levels will show up here."
+              description="Add products to the catalog and their stock levels will show up here."
             />
           ) : (
             <EmptyState
               icon={<SearchIcon />}
               title="No products match these filters"
-              description="Try a different name or SKU, or turn off “Low stock only”."
-              action={{
-                label: "Clear filters",
-                onClick: () => {
-                  setQ("");
-                  setLowOnly(false);
-                },
-              }}
+              description="Try a different name or SKU, or turn off Low stock only."
+              action={{ label: "Clear filters", onClick: clearFilters }}
             />
           )
         ) : null}
@@ -159,8 +201,6 @@ export function InventoryTable({ products: serverProducts }: { products: Product
   );
 }
 
-// Inline editor: Enter or Save commits, Escape or Cancel discards. (No save/cancel on blur: Safari
-// doesn't focus buttons on click, so a blur handler would cancel before Save could fire.)
 function StockEditor({
   initial,
   name,
@@ -208,7 +248,7 @@ function StockEditor({
           onKeyDown={(e) => {
             if (e.key === "Escape") onCancel();
           }}
-          className="num w-24 rounded-md border border-line-strong bg-bg px-2 py-1 text-right outline-none focus:border-accent"
+          className="num w-20 rounded-md border border-line-strong bg-bg px-2 py-1 text-right outline-none focus:border-accent"
         />
         <button type="submit" disabled={busy} className="rounded-md bg-accent px-2.5 py-1 text-xs font-semibold text-accent-ink disabled:opacity-50">
           Save
@@ -226,22 +266,21 @@ function StockEditor({
   );
 }
 
-// Red below the threshold, as the Week 5 doc asks; zero gets its own wording.
 function StockBadge({ stock }: { stock: number }) {
   if (stock === 0) {
-    return <span className="rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-semibold text-danger">Out of stock</span>;
+    return <span className="shrink-0 rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-semibold text-danger">Out of stock</span>;
   }
   if (stock < LOW_STOCK_THRESHOLD) {
-    return <span className="rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-semibold text-danger">Low stock</span>;
+    return <span className="shrink-0 rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-semibold text-danger">Low stock</span>;
   }
-  return <span className="text-xs text-muted">OK</span>;
+  return <span className="shrink-0 text-xs text-muted">OK</span>;
 }
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {
   return (
-    <div className="rounded-xl border border-line bg-surface px-4 py-3">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className={`num mt-1 text-2xl font-semibold ${tone === "danger" ? "text-danger" : ""}`}>{value}</dd>
+    <div className="rounded-xl border border-line bg-surface px-3 py-3 sm:px-4">
+      <dt className="text-xs text-muted leading-tight">{label}</dt>
+      <dd className={`num mt-1 text-xl font-semibold sm:text-2xl ${tone === "danger" ? "text-danger" : ""}`}>{value}</dd>
     </div>
   );
 }

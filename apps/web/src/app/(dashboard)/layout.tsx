@@ -3,8 +3,9 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { UserMenu, UserMenuSkeleton } from "@/components/user-menu";
 
-// The shell (sidebar, header frame) is static. Everything that reads the session streams in
-// behind a <Suspense> boundary: the user menu here, each page's data via loading.tsx.
+// Shell layout:
+//   mobile  → full-width content + fixed bottom tab bar (no sidebar)
+//   md+     → 232 px sidebar on the left + content on the right (sticky sidebar)
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen md:grid md:grid-cols-[232px_1fr]">
@@ -15,7 +16,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         Skip to content
       </a>
-      <aside className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-side px-4 py-3 text-side-ink md:sticky md:top-0 md:h-screen md:flex-col md:flex-nowrap md:items-stretch md:gap-8 md:px-4 md:py-6">
+
+      {/* ── Desktop sidebar ─────────────────────────────────────────── */}
+      <aside className="hidden bg-side text-side-ink md:sticky md:top-0 md:flex md:h-screen md:flex-col md:gap-8 md:px-4 md:py-6">
         <div className="flex items-center gap-2.5 px-2">
           <span
             aria-hidden
@@ -26,18 +29,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="text-base font-semibold tracking-tight">OrderFlow</span>
         </div>
         <SidebarNav />
-        <p className="mt-auto hidden px-2 text-xs text-side-muted md:block">Admin dashboard</p>
+        <p className="mt-auto px-2 text-xs text-side-muted">Admin dashboard</p>
       </aside>
 
-      <div className="flex min-w-0 flex-col">
-        <header className="flex h-14 items-center justify-end gap-3 border-b border-line bg-surface px-4 sm:px-8">
-          <ThemeToggle />
-          <Suspense fallback={<UserMenuSkeleton />}>
-            <UserMenu />
-          </Suspense>
+      {/* ── Main content column ─────────────────────────────────────── */}
+      <div className="flex min-w-0 flex-col pb-16 md:pb-0">
+        <header className="flex h-14 items-center justify-between gap-3 border-b border-line bg-surface px-4 sm:px-6 md:justify-end">
+          {/* Brand mark visible only on mobile (sidebar is hidden) */}
+          <div className="flex items-center gap-2 md:hidden">
+            <span
+              aria-hidden
+              className="grid size-7 place-items-center rounded-md bg-accent font-mono text-xs font-bold text-accent-ink"
+            >
+              OF
+            </span>
+            <span className="text-sm font-semibold tracking-tight">OrderFlow</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Suspense fallback={<UserMenuSkeleton />}>
+              <UserMenu />
+            </Suspense>
+          </div>
         </header>
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none sm:px-8 sm:py-8">{children}</main>
+
+        <main
+          id="main"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 outline-none sm:px-6 sm:py-7 md:px-8 md:py-8"
+        >
+          {children}
+        </main>
       </div>
+
+      {/* ── Mobile bottom tab bar ────────────────────────────────────── */}
+      <nav
+        aria-label="Main"
+        className="safe-bottom fixed bottom-0 left-0 right-0 z-40 flex border-t border-line bg-side md:hidden"
+      >
+        <SidebarNav mobile />
+      </nav>
     </div>
   );
 }

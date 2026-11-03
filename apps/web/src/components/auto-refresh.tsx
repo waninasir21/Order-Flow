@@ -8,10 +8,12 @@ import { useEffect } from "react";
 // page's server components, which re-run their backend queries with the httpOnly cookie.
 // Client state (filters, an open stock editor, the optimistic layer) survives a refresh.
 // A hidden tab does nothing, so a forgotten dashboard tab doesn't poll the backend all night.
-export function AutoRefresh({ intervalMs = 10_000 }: { intervalMs?: number }) {
+// `enabled` lets callers pause polling (e.g. when there is nothing to refresh yet).
+export function AutoRefresh({ intervalMs = 10_000, enabled = true }: { intervalMs?: number; enabled?: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
+    if (!enabled) return;
     const tick = () => {
       if (document.visibilityState === "visible") router.refresh();
     };
@@ -21,7 +23,7 @@ export function AutoRefresh({ intervalMs = 10_000 }: { intervalMs?: number }) {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [router, intervalMs]);
+  }, [router, intervalMs, enabled]);
 
   return null;
 }
